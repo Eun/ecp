@@ -40,7 +40,6 @@
 # define md5_finish_ctx __md5_finish_ctx
 # define md5_read_ctx __md5_read_ctx
 # define md5_stream __md5_stream
-# define md5_buffer __md5_buffer
 #endif
 
 #ifdef WORDS_BIGENDIAN
@@ -59,6 +58,9 @@
    64-byte boundary.  (RFC 1321, 3.1: Step 1)  */
 static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 
+
+void copy_process_bytes (const void *buffer, size_t len, FILE* dststream);
+void copy_process_block (const void *buffer, size_t len, FILE* dststream);
 
 /* Initialize structure containing state of computation.
    (RFC 1321, 3.3: Step 3)  */
@@ -100,7 +102,7 @@ md5_read_ctx (const struct md5_ctx *ctx, void *resbuf)
 /* Process the remaining bytes in the internal buffer and the usual
    prolog according to the standard and write the result to RESBUF.  */
 void *
-md5_finish_ctx (struct md5_ctx *ctx, void *resbuf)
+md5_finish_ctx (FILE* dststream, struct md5_ctx *ctx, void *resbuf)
 {
   /* Take yet unprocessed bytes into account.  */
   uint32_t bytes = ctx->buflen;
@@ -119,6 +121,8 @@ md5_finish_ctx (struct md5_ctx *ctx, void *resbuf)
 
   /* Process last bytes.  */
   md5_process_block (ctx->buffer, size * 4, ctx);
+ // if (dststream)
+ //   copy_process_block (ctx->buffer, size * 4, dststream);
 
   return md5_read_ctx (ctx, resbuf);
 }
@@ -127,7 +131,7 @@ md5_finish_ctx (struct md5_ctx *ctx, void *resbuf)
    resulting message digest number will be written into the 16 bytes
    beginning at RESBLOCK.  */
 int
-md5_stream (FILE *stream, void *resblock)
+md5_stream (FILE *stream, FILE *dststream, void *resblock)
 {
   struct md5_ctx ctx;
   size_t sum;
@@ -182,37 +186,24 @@ md5_stream (FILE *stream, void *resblock)
          BLOCKSIZE % 64 == 0
        */
       md5_process_block (buffer, BLOCKSIZE, &ctx);
+      if (dststream)
+        copy_process_block (buffer, BLOCKSIZE, dststream);
     }
 
 process_partial_block:
 
   /* Process any remaining bytes.  */
   if (sum > 0)
+  {
     md5_process_bytes (buffer, sum, &ctx);
+    if (dststream)
+      copy_process_bytes (buffer, sum, dststream);
+  }
 
   /* Construct result in desired memory.  */
-  md5_finish_ctx (&ctx, resblock);
+  md5_finish_ctx (dststream, &ctx, resblock);
   free (buffer);
   return 0;
-}
-
-/* Compute MD5 message digest for LEN bytes beginning at BUFFER.  The
-   result is always in little endian byte order, so that a byte-wise
-   output yields to the wanted ASCII representation of the message
-   digest.  */
-void *
-md5_buffer (const char *buffer, size_t len, void *resblock)
-{
-  struct md5_ctx ctx;
-
-  /* Initialize the computation context.  */
-  md5_init_ctx (&ctx);
-
-  /* Process whole buffer but last len % 64 bytes.  */
-  md5_process_bytes (buffer, len, &ctx);
-
-  /* Put result in desired memory area.  */
-  return md5_finish_ctx (&ctx, resblock);
 }
 
 

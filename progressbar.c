@@ -11,24 +11,6 @@ int getWidth()
     return w.ws_col;
 }
 
-void RevertLines(int count)
-{
-	int i;
-	for (i = 0; i < count; i++) {
-		putchar(0x1B);
-		fputs("[1A", stdout); // up
-		putchar(0x1B);
-		fputs("[2K", stdout); // clear
-	}
-}
-
-void DrawLines(char *line1, char *line2)
-{
-	RevertLines(2);
-	puts(line1);
-	puts(line2);
-}
-
 void GetSpeed(int bytes, char *buffer)
 {
 	char unit[] = "B/s ";
@@ -52,7 +34,7 @@ void GetSpeed(int bytes, char *buffer)
 		bytes = bytes / 1024;
 		strcpy(unit, "TB/s");
 	}
-	memset(buffer, 0, 8);
+	memset(buffer, 0, 9);
 	sprintf(buffer, "%4d%s", bytes, unit);
 }
 
@@ -65,22 +47,25 @@ char *basename(char *in, int len)
 	{
 		if (in[i] == '/')
 		{
-			char *ret = (char*)malloc(len-i);
+			i++;
+			char *ret = (char*)malloc(sizeof(char)*(len-i+1));
 			memcpy(ret, in+i, len-i);
+			ret[len-i] = 0;
 			return ret;
 		}
 	}
-	char *ret = (char*)malloc(len);
+	char *ret = (char*)malloc(sizeof(char)*(len+1));
 	memcpy(ret, in, len);
+	ret[len] = 0;
 	return ret;
 }
 
 void DrawProgressBar(double percent, double speed, char *file)
 {
 	int width = getWidth();
-
-	char speedbuffer[8];
+	char speedbuffer[9];
 	GetSpeed(speed, speedbuffer);
+
 
 	int flen = strlen(file);
 
@@ -103,6 +88,7 @@ void DrawProgressBar(double percent, double speed, char *file)
 			filebuffer[width_of_file] = 0;
 		}
 		printf("\r%s", filebuffer);
+		free(filebuffer);
 	}
 	else
 	{
@@ -135,6 +121,7 @@ void DrawProgressBar(double percent, double speed, char *file)
 
 }
 
+/*
 int main (int argc, char **argv) {
 	double i;
 	//printf("\e[?25l");
@@ -150,3 +137,4 @@ int main (int argc, char **argv) {
     //printf("\e[?25h");
     return 0;
 }
+*/
