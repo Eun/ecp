@@ -186,8 +186,7 @@ md5_stream (FILE *stream, FILE *dststream, void *resblock)
          BLOCKSIZE % 64 == 0
        */
       md5_process_block (buffer, BLOCKSIZE, &ctx);
-      if (dststream)
-        copy_process_block (buffer, BLOCKSIZE, dststream);
+      copy_process_block (buffer, BLOCKSIZE, dststream);
     }
 
 process_partial_block:
@@ -196,8 +195,7 @@ process_partial_block:
   if (sum > 0)
   {
     md5_process_bytes (buffer, sum, &ctx);
-    if (dststream)
-      copy_process_bytes (buffer, sum, dststream);
+    copy_process_bytes (buffer, sum, dststream);
   }
 
   /* Construct result in desired memory.  */

@@ -4,6 +4,7 @@
 #include "fadvise.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h> 
 
 
 
@@ -17,9 +18,12 @@ char *ffile;
 
 void copy_process_block (const void *buffer, size_t len, FILE* dststream)
 {
-  if (fwrite(buffer, len, 1, dststream) < 0 )
+  if (dststream != NULL)
   {
-    printf("error on wrting to destination\n");
+    if (fwrite(buffer, len, 1, dststream) < 0 )
+    {
+      printf("error on wrting to destination\n");
+    }
   }
   wSize+=len;
   DrawProgressBar((double)100*wSize/fSize, 0.0, ffile);
@@ -193,16 +197,16 @@ int GetFileType(char *target)
   {
     if(S_ISDIR(st.st_mode))
     {
-     return -1;
+     return -1; // folder
    }
    else if(S_ISREG(st.st_mode))
    {
-     return st.st_size;
+     return st.st_size; // file
    }
    else
-    return -2;
+    return -2; // unknown file
  }
- return -3;
+ return -3; // stat failed
 }
 
 unsigned char mkdir_p(char *folder, size_t len)
@@ -388,30 +392,9 @@ void FreeDataSet(struct DataList *datalist, int i)
 
 }
 
-// ecp file file
-// ecp file folder    // folder must exist
-// ecp file folder/   // folder musn't exist
-// ecp file1 file2 folder // folder musn't exist
-// ecp file1 file2 folder/ // folder musn't exist
-
-int main (int argc, char **argv)
-{ 
-  if (argc < 3)
-  {
-      // todo: basename
-    char *exe = basename(argv[0], strlen(argv[0]));
-    printf("usage: %s <source> <destination>\n", exe);
-    free(exe);
-    return 1;
-  }
-  int i;
-  char *target = argv[--argc];
-
-  target = TargetPreCheck(target, argc--);
-  if (target == NULL)
-  {
-    return 1;
-  }
+/*
+void DoWork()
+{
   struct DataList *datalist = (struct DataList*)malloc(sizeof(struct DataList)*argc);
   
   for (i = 0; i < argc; i++)
@@ -476,7 +459,118 @@ for (i = 0; i < argc; i++)
    FreeDataSet(datalist, i);
  }
 }
-free(datalist);
-free(target);
-return 0;
+}*/
+
+
+/*void BuildFileList(int argc, char **argv)
+{
+  for (i = 0; i < argc; i++)
+  {
+    int ft = GetFileType(argv[i+1]);
+    if (ft == -1)
+    {
+
+    }
+    else
+    {
+      
+    }
+  }
+}*/
+
+  void AddFile(char *path)
+{
+  printf("Adding File: %s\n",path);
+}
+
+void AddFolder(char *path)
+{
+  int len = strlen(path);
+  DIR           *d;
+  struct dirent *dir;
+  d = opendir(path);
+  if (d)
+  {
+    while ((dir = readdir(d)) != NULL)
+    {
+      int len2 = strlen(dir->d_name);
+      unsigned char appendslash = 0;
+      char *folder = (char*)malloc(sizeof(char)*(len+len2+2));
+      memcpy(folder, path, len); 
+      if (folder[len] != '/')
+      {
+        memcpy(folder+1, "/", 1);
+        appendslash = 1;
+      }
+      memcpy(folder+len+appendslash, dir->d_name, len2);
+      folder[len+appendslash+len2] = 0;
+      printf("FOLDER: %s\n", folder);
+      int ft = GetFileType(folder);
+      if (ft == -1)
+      {
+          AddFolder(folder);
+      }
+      else
+      {
+          AddFile(folder);
+      }
+      free(folder);
+    }
+
+    closedir(d);
+  }
+
+
+}
+
+
+
+// ecp file file
+// ecp file folder    // folder must exist
+// ecp file folder/   // folder musn't exist
+// ecp file1 file2 folder // folder musn't exist
+// ecp file1 file2 folder/ // folder musn't exist
+
+
+
+int main (int argc, char **argv)
+{ 
+  if (argc < 3)
+  {
+      // todo: basename
+    char *exe = basename(argv[0], strlen(argv[0]));
+    printf("usage: %s <source> <destination>\n", exe);
+    free(exe);
+    return 1;
+  }
+
+  int i;
+  char *target = argv[--argc];
+
+  target = TargetPreCheck(target, argc--);
+  if (target == NULL)
+  {
+    return 1;
+  }
+
+  //std::list<std::string> files;
+  for (i = 0; i < argc; i++)
+  {
+    int ft = GetFileType(argv[i+1]);
+    if (ft == -1)
+    {
+        AddFolder(argv[i+1]);
+    }
+    else
+    {
+        AddFile(argv[i+1]);
+    }
+  }
+
+
+
+
+  //free(datalist);
+  free(target);
+  return 0;
 }
