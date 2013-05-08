@@ -1,4 +1,4 @@
-BIN = a.out
+BIN = ecp
 CC = gcc
 CPLUS = g++
 LINK = g++
