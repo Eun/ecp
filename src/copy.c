@@ -12,6 +12,7 @@
 
 void DrawProgressBar(double percent, double speed, char *file);
 char *basename(char *in, int len);
+char *dirname(char *in, int len);
 
 
 int fSize;
@@ -343,139 +344,127 @@ else
 
 
 
-char *SetTarget(char *target, char *dstname)
-{
-  int len = strlen(target);
-  if (target[len-1] != '/')
-  {
-
-   char *newtarget = (char*)malloc(sizeof(char)*(len+1));
-   memcpy(newtarget, target, len);
-   newtarget[len] = 0;
-   return newtarget;
- }
- else
- {
-   int dlen = strlen(dstname);
-   char *newtarget = (char*)malloc(sizeof(char)*(len+dlen+1));
-   memcpy(newtarget, target, len);
-   memcpy(newtarget+len, dstname, dlen);
-   newtarget[len+dlen] = 0;
-   return newtarget;
- }
-}
-
-struct DataList
+struct DataNode
 {
   char *checksum;
   char *source;
   char *destination;
+  struct DataNode *next;
 };
 
-void FreeDataSet(struct DataList *datalist, int i)
+void FreeNodeContents(struct DataNode *node)
 {
-  if (datalist[i].source != NULL)
+  if (node->source != NULL)
   {
-    free(datalist[i].source);
-    datalist[i].source = NULL;
+    free(node->source);
+    node->source = NULL;
   }
-  if (datalist[i].destination != NULL)
+  if (node->destination != NULL)
   {
-    free(datalist[i].destination);
-    datalist[i].destination = NULL;
+    free(node->destination);
+    node->destination = NULL;
   }
-  if (datalist[i].checksum != NULL)
+  if (node->checksum != NULL)
   {
-    free(datalist[i].checksum);
-    datalist[i].checksum = NULL;
+    free(node->checksum);
+    node->checksum = NULL;
   }
-
 }
 
-/*
-void DoWork()
+
+void DoWork(struct DataNode *node)
 {
-  struct DataList *datalist = (struct DataList*)malloc(sizeof(struct DataList)*argc);
-  
-  for (i = 0; i < argc; i++)
+  while (node)
   {
-   int len = strlen(argv[i+1]);
-   datalist[i].source = (char*)malloc(sizeof(char)*(len+1));
-   memcpy(datalist[i].source, argv[i+1], len);
-   datalist[i].source[len] = 0;
-
-   char *dstname = basename(datalist[i].source, len);
-   datalist[i].destination = SetTarget(target,dstname);
-   free(dstname);
-
-   datalist[i].checksum = NULL;
-   int filesize = GetFileType(datalist[i].destination);
+   int filesize = GetFileType(node->destination);
    if (filesize > 0)
    {
-
-    if (GetFileType(datalist[i].source) == filesize)
+    if (GetFileType(node->source) == filesize)
     {
       char *checksum = (char*)malloc(sizeof(char)*32);
-      datalist[i].checksum = (char*)malloc(sizeof(char)*32);
-      //printf("Comparing Checksums (%s)\n",datalist[i].destination);
-      md5sum(datalist[i].source, datalist[i].checksum); 
-      md5sum(datalist[i].destination, checksum); 
+      node->checksum = (char*)malloc(sizeof(char)*32);
+      //printf("Comparing Checksums (%s)\n",node->destination);
+      md5sum(node->source, node->checksum); 
+      md5sum(node->destination, checksum); 
 
-      if (memcmp(checksum, datalist[i].checksum, 32) == 0)
+      if (memcmp(checksum, node->checksum, 32) == 0)
       {
         free(checksum);
-        printf("Skipping %s\n", datalist[i].source);
-        FreeDataSet(datalist, i);
+        printf("Skipping %s\n", node->source);
+        FreeNodeContents(node);
         continue; 
       }
       free(checksum);
     }
   }
 
-  if (datalist[i].checksum == NULL)
+  // check if the destination folder exists
+  char *destfolder = dirname(node->destination, strlen(node->destination));
+  if (GetFileType(destfolder) != -1)
   {
-    datalist[i].checksum = (char*)malloc(sizeof(char)*32);
-    md5copy(datalist[i].source,  datalist[i].destination, datalist[i].checksum); 
+    //printf("Creating %s\n", destfolder);
+    if (mkdir_p(destfolder, strlen(destfolder)) == 0)
+     {
+      printf("skipping '%s' could not create destination folder\n", node->source);
+    }
+  }
+  free (destfolder);
+
+  if (node->checksum == NULL)
+  {
+    node->checksum = (char*)malloc(sizeof(char)*32);
+    md5copy(node->source,  node->destination, node->checksum); 
   }
   else
   {
-    rawcopy(datalist[i].source,  datalist[i].destination);
+    rawcopy(node->source,  node->destination);
   }
   puts("");
+  node = node->next;
 }
 
-for (i = 0; i < argc; i++)
+while (node)
 {
- if (datalist[i].checksum != NULL)
+ if (node->checksum != NULL)
  {
-   printf("\rComparing Checksums (%s)",datalist[i].destination);
+   printf("\rComparing Checksums (%s)",node->destination);
    char *checksum = (char*)malloc(sizeof(char)*32);
-   md5sum(datalist[i].destination, checksum); 
-   if (memcmp(datalist[i].checksum, checksum, 32) != 0)
+   md5sum(node->destination, checksum); 
+   if (memcmp(node->checksum, checksum, 32) != 0)
    {
-      printf("Checksum for '%s' failed\n", datalist[i].source);
+      printf("Checksum for '%s' failed\n", node->source);
    }
    free(checksum);
-   FreeDataSet(datalist, i);
+   FreeNodeContents(node);
  }
+ node = node->next;
 }
-}*/
+}
 
 
 
-void AddFile(char *src, int lsrc, char *path, int lpath, char *dst, int ldst)
+struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
-
-  char *dstpath = (char*)malloc(sizeof(char*)*(lpath-lsrc+ldst+1));
+  char *dstpath = (char*)malloc(sizeof(char*)*(lpath+ldst-lsrc+1));
   memcpy(dstpath, dst, ldst);
   memcpy(dstpath+ldst, path+lsrc, lpath-lsrc);
-  dstpath[lpath-lsrc+ldst] = 0;
-  printf("Adding File: %s => %s\n", path, dstpath);
-  free(dstpath);
+  dstpath[lpath+ldst-lsrc] = 0;
+
+  struct DataNode *node = (struct DataNode*)malloc(sizeof(struct DataNode));
+  node->checksum = NULL;
+  node->source = (char*)malloc(sizeof(char*)*(lsrc+1));
+  memcpy(node->source, path, lpath);
+  node->source[lpath] = 0;
+  node->destination = dstpath;
+  node->next = NULL;
+  return node;
 }
 
-void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
+struct DataNode* AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
+  struct DataNode *firstNode = NULL;
+  struct DataNode *node;
+  struct DataNode *newnode;
   DIR           *d;
   struct dirent *dir;
   d = opendir(path);
@@ -489,7 +478,6 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
         srcWithSlash[lsrc] = '/';
         srcWithSlash[++lsrc] = 0;
     }
-
     while ((dir = readdir(d)) != NULL)
     {
       int len2 = strlen(dir->d_name);
@@ -503,23 +491,47 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
       int lfolder = lpath+len2+1;
       char *folder = (char*)malloc(sizeof(char)*(lfolder+1));
       memcpy(folder, path, lpath); 
-      if (folder[lpath-1] != '/')
+      if (path[lpath-1] != '/')
       {
         folder[lpath] = '/';
         appendslash = 1;
       }
+      else
+      {
+        lfolder--;
+      }
       memcpy(folder+lpath+appendslash, dir->d_name, len2);
-      folder[lpath+appendslash+len2] = 0;
+      folder[lfolder] = 0;
       int ft = GetFileType(folder);
       if (ft == -1)
       {
-          AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
+          char *subdst = basename(path, lpath-((appendslash) ? 0 : 1));
+          int lsubdst = strlen(subdst);
+          int lndst = ldst+lsubdst+1;
+          char *ndst = (char*)malloc(sizeof(char*)*(lndst+1));
+          memcpy(ndst, dst, ldst);
+          memcpy(ndst+ldst, subdst, lsubdst);
+          ndst[lndst-1] = '/';
+          ndst[lndst] = 0;
+          free(subdst);
+          newnode = AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, ndst, lndst);
+          free(ndst);
       }
       else
       {
-          AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
+          newnode = AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
       }
       free(folder);
+      if (newnode)
+      {
+        if (firstNode == NULL)
+          firstNode = newnode;
+        else
+          node->next = newnode;
+        node = newnode;
+        while (node->next)
+          node = node->next;
+      }
     }
 
     if (srcWithSlash != NULL)
@@ -529,6 +541,8 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 
     closedir(d);
   }
+
+  return firstNode;
 
 
 }
@@ -545,7 +559,6 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 
 int main (int argc, char **argv)
 { 
-
   if (argc < 3)
   {
       // todo: basename
@@ -564,25 +577,50 @@ int main (int argc, char **argv)
     return 1;
   }
 
+
   int ltarget = strlen(target);
 
-  //std::list<std::string> files;
+  struct DataNode *firstNode = NULL;
+  struct DataNode *node;
+  struct DataNode *newnode;
   for (i = 0; i < argc; i++)
   {
-    //printf("F: %s\n", argv[i+1]);
     int ft = GetFileType(argv[i+1]);
     int len = strlen(argv[i+1]);
     if (ft == -1)
     {
-
-        AddFolder(argv[i+1], len, argv[i+1], len, target, ltarget);
+        newnode = AddFolder(argv[i+1], len, argv[i+1], len, target, ltarget);
     }
     else
     {
-        AddFile(argv[i+1], len, argv[i+1], len, target, ltarget);
+        char *sdir = dirname(argv[i+1], len);
+        newnode = AddFile(sdir, strlen(sdir), argv[i+1], len, target, ltarget);
+        free(sdir);
     }
-    
+    if (newnode)
+    {
+      if (firstNode == NULL)
+        firstNode = newnode;
+      else
+        node->next = newnode;
+      node = newnode;
+      while (node->next)
+        node = node->next;
+    }
   }
+
+  DoWork(firstNode);
+
+  // cleanup
+  node = firstNode;
+  while (node != NULL) 
+  {
+    struct DataNode *nnode = node->next;
+    FreeNodeContents(node);
+    free(node);
+    node = nnode;
+  }
+  
 
 
 

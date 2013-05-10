@@ -6,8 +6,8 @@ OBJC = $(shell find ./src/ -name "*.c" | sed 's/\.c/\.o/g' | sed 's/\.\/src\//\.
 OBJCPP = $(shell find ./src/ -name "*.cpp" | sed 's/\.cpp/\.opp/g' | sed 's/\.\/src\//\.\/obj\//g')
 OBJ = $(OBJC) $(OBJCPP)
 
-CFLAGS = -Wall -I./inc/
-CPPFLAGS = -Wall -I./inc/
+CFLAGS = -Wall -I./inc/ -g
+CPPFLAGS = -Wall -I./inc/ -g
 LDFLAGS = -Wall
 LIBS = 
 

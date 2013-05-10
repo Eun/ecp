@@ -62,6 +62,27 @@ char *basename(char *in, int len)
 	return ret;
 }
 
+char *dirname(char *in, int len)
+{
+	int i;
+	for (i = len - 1; i >= 0; i--)
+	{
+		if (in[i] == '/')
+		{
+			i++;
+			char *ret = (char*)malloc(sizeof(char)*(i+1));
+			memcpy(ret, in, i);
+			ret[i+1] = 0;
+			return ret;
+		}
+	}
+	char *ret = (char*)malloc(sizeof(char)*(len+1));
+	memcpy(ret, in, len);
+	ret[len] = 0;
+	return ret;
+}
+
+
 void DrawProgressBar(double percent, double speed, char *file)
 {
 	int width = getWidth();
