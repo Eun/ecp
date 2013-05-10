@@ -8,7 +8,9 @@ Important
 * Create the destionation folders
 
 
+
 Whishlist
 ---------
+* Toggle Create Empty Directorys
 * Toggle checksum on/off
 * SHA1 Checksum

@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h> 
+#include <string.h>
+#include <stdlib.h>
 
 
 
@@ -48,7 +50,6 @@ unsigned char rawcopy(char *src, char *dst)
 {
 
   FILE *fp, *fpdst;
-  int err;
 
   fp = fopen (src, "rb");
   if (fp == NULL)
@@ -71,11 +72,10 @@ unsigned char rawcopy(char *src, char *dst)
   ffile = src;
 
   fadvise (fp, FADVISE_SEQUENTIAL);
-  int wSize = 0;
     char buffer[100];
     while(feof(fp)==0)
     {  
-      int numr,numw;
+      int numr;
       if((numr=fread(buffer,1,100,fp))!=100)
       {
         if(ferror(fp)!=0)
@@ -462,59 +462,69 @@ for (i = 0; i < argc; i++)
 }*/
 
 
-/*void BuildFileList(int argc, char **argv)
-{
-  for (i = 0; i < argc; i++)
-  {
-    int ft = GetFileType(argv[i+1]);
-    if (ft == -1)
-    {
 
-    }
-    else
-    {
-      
-    }
-  }
-}*/
-
-  void AddFile(char *path)
+void AddFile(char *src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
-  printf("Adding File: %s\n",path);
+
+  char *dstpath = (char*)malloc(sizeof(char*)*(lpath-lsrc+ldst+1));
+  memcpy(dstpath, dst, ldst);
+  memcpy(dstpath+ldst, path+lsrc, lpath-lsrc);
+  dstpath[lpath-lsrc+ldst] = 0;
+  printf("Adding File: %s => %s\n", path, dstpath);
+  free(dstpath);
 }
 
-void AddFolder(char *path)
+void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
-  int len = strlen(path);
   DIR           *d;
   struct dirent *dir;
   d = opendir(path);
   if (d)
   {
+    char *srcWithSlash = NULL;
+    if (src[lsrc-1] != '/')
+    {
+        srcWithSlash = (char*)malloc(sizeof(char*)*(lsrc+2));
+        memcpy(srcWithSlash, src, lsrc);
+        srcWithSlash[lsrc] = '/';
+        srcWithSlash[++lsrc] = 0;
+    }
+
     while ((dir = readdir(d)) != NULL)
     {
       int len2 = strlen(dir->d_name);
-      unsigned char appendslash = 0;
-      char *folder = (char*)malloc(sizeof(char)*(len+len2+2));
-      memcpy(folder, path, len); 
-      if (folder[len] != '/')
+
+      if ((len2 == 1 && dir->d_name[0] == '.') || (len2 == 2 && dir->d_name[0] == '.' && dir->d_name[1] == '.'))
       {
-        memcpy(folder+1, "/", 1);
+        continue;
+      }
+
+      unsigned char appendslash = 0;
+      int lfolder = lpath+len2+1;
+      char *folder = (char*)malloc(sizeof(char)*(lfolder+1));
+      memcpy(folder, path, lpath); 
+      if (folder[lpath-1] != '/')
+      {
+        folder[lpath] = '/';
         appendslash = 1;
       }
-      memcpy(folder+len+appendslash, dir->d_name, len2);
-      folder[len+appendslash+len2] = 0;
-      printf("FOLDER: %s\n", folder);
+      memcpy(folder+lpath+appendslash, dir->d_name, len2);
+      folder[lpath+appendslash+len2] = 0;
       int ft = GetFileType(folder);
       if (ft == -1)
       {
-          AddFolder(folder);
+          AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
       }
       else
       {
-          AddFile(folder);
+          AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
       }
       free(folder);
+    }
+
+    if (srcWithSlash != NULL)
+    {
+      free(srcWithSlash);
     }
 
     closedir(d);
@@ -535,6 +545,7 @@ void AddFolder(char *path)
 
 int main (int argc, char **argv)
 { 
+
   if (argc < 3)
   {
       // todo: basename
@@ -553,18 +564,24 @@ int main (int argc, char **argv)
     return 1;
   }
 
+  int ltarget = strlen(target);
+
   //std::list<std::string> files;
   for (i = 0; i < argc; i++)
   {
+    //printf("F: %s\n", argv[i+1]);
     int ft = GetFileType(argv[i+1]);
+    int len = strlen(argv[i+1]);
     if (ft == -1)
     {
-        AddFolder(argv[i+1]);
+
+        AddFolder(argv[i+1], len, argv[i+1], len, target, ltarget);
     }
     else
     {
-        AddFile(argv[i+1]);
+        AddFile(argv[i+1], len, argv[i+1], len, target, ltarget);
     }
+    
   }
 
 
