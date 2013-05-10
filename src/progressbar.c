@@ -94,10 +94,10 @@ void DrawProgressBar(double percent, double speed, char *file)
 
     //|01234567890123456789|
     //|01234 1023KB/s 99.9%|
-	int width_of_file_and_bar = width - 16;
+	int width_of_file_and_bar = width - 16; // 16 = ' 9999MB/s 100.0%'
 
-	int width_of_file = (width_of_file_and_bar*2/10);
-	int width_of_bar = width_of_file_and_bar - width_of_file;
+	int width_of_file = (width_of_file_and_bar*2/10); // File has 20 Percent of space
+	int width_of_bar = width_of_file_and_bar - width_of_file; // Bar has the rest
 	if (width_of_bar < 13)
 	{
 		width_of_file = width_of_file_and_bar;

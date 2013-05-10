@@ -559,6 +559,24 @@ struct DataNode* AddFolder(char* src, int lsrc, char *path, int lpath, char *dst
 
 int main (int argc, char **argv)
 { 
+
+  // test progressbar
+  {
+  double i;
+    //printf("\e[?25l");
+    //puts("");
+    //srand (time(NULL));
+    //DrawProgressBar(99.9, 962486234, "/usr/bin/path/blup");
+    for (i = 0; i <= 100; i+=0.5f)
+    {
+      DrawProgressBar(i, 962486234, argv[1]);
+      usleep(10000);
+      }
+    
+      //printf("\e[?25h");
+    return 1;
+  }
+
   if (argc < 3)
   {
       // todo: basename
