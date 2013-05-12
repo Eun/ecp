@@ -4,9 +4,7 @@ TODO
 
 Important
 ---------
-* Build a List of sources and destinations
-* Create the destionation folders
-
+* Progressbar on generating checksum
 
 
 Whishlist

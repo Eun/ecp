@@ -72,7 +72,7 @@ char *dirname(char *in, int len)
 			i++;
 			char *ret = (char*)malloc(sizeof(char)*(i+1));
 			memcpy(ret, in, i);
-			ret[i+1] = 0;
+			ret[i] = 0;
 			return ret;
 		}
 	}
@@ -94,54 +94,83 @@ void DrawProgressBar(double percent, double speed, char *file)
 
     //|01234567890123456789|
     //|01234 1023KB/s 99.9%|
+    unsigned char showstats = 1;
 	int width_of_file_and_bar = width - 16; // 16 = ' 9999MB/s 100.0%'
 
-	int width_of_file = (width_of_file_and_bar*2/10); // File has 20 Percent of space
-	int width_of_bar = width_of_file_and_bar - width_of_file; // Bar has the rest
-	if (width_of_bar < 13)
+
+	int width_of_file = (width_of_file_and_bar*35/100); // File has 35 Percent of space
+	int width_of_bar = width_of_file_and_bar - width_of_file - 1; // Bar has the rest
+	if (width_of_bar < 12 || width_of_file < 10) // if Bar is less then 12 hide the bar or file is too small
 	{
 		width_of_file = width_of_file_and_bar;
 		width_of_bar = 0;
 	}
-	if (width_of_file < flen)
+
+	if (width_of_file < 10)
+	{
+		width_of_file = width;
+		showstats = 0;
+	}
+
+
+	if (width_of_file < flen)  // if the file is greather then the width that is reserved, get the basename
 	{
 		char *filebuffer = basename(file, flen);
-		if (width_of_file < strlen(filebuffer))
+		flen = strlen(filebuffer);
+		if (width_of_file < flen)	// still longer cut off
 		{
 			filebuffer[width_of_file] = 0;
+			flen = width_of_file;
 		}
+
 		printf("\r%s", filebuffer);
 		free(filebuffer);
+
+		while (flen < width_of_file)
+		{
+			putchar(' ');
+			flen++;
+		}
 	}
 	else
 	{
 		printf("\r%s", file);
+
+		while (flen < width_of_file)
+		{
+			putchar(' ');
+			flen++;
+		}
+
 	}
 
-	if (width_of_bar > 0)
-	{
-		int i;
-		int p = (width_of_bar*percent/100);
-		fputs(" [", stdout);
+	if (showstats)
+	{	
+		if (width_of_bar > 0)
+		{
+			int i;
+			int p = (width_of_bar*percent/100);
+			fputs("  [", stdout);
 
-		for (i = 3; i < p; i++)
-		{
-			putchar('=');	
-		}
-		if (p < width_of_bar)
-		{
-			putchar('>');	
-			for (i=i+1; i < width_of_bar; i++)
+			for (i = 3; i < p; i++)
 			{
-				putchar(' ');	
+				putchar('=');	
 			}
+			if (p < width_of_bar)
+			{
+				putchar('>');	
+				for (i=i+1; i < width_of_bar; i++)
+				{
+					putchar(' ');	
+				}
+			}
+			putchar(']');
 		}
-		putchar(']');
+
+		printf(" %s %5.1f%%", speedbuffer, percent);
+		fflush(stdout);
 	}
-
-	printf(" %s %5.1f%% ", speedbuffer, percent);
-	fflush(stdout);
-
+	
 }
 
 /*

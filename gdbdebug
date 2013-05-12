@@ -1,1 +1,4 @@
-gdb --directory ./src/ --args ./bin/ecp.exe test/source/ test/destination
+#gdb --directory ./src/ --args ./bin/ecp.exe test/source/ test/destination
+#gdb --directory ./src/ --args ./bin/ecp.exe "Z:\Android" "C:\cygwin\home\gamer\ecp\test"
+#gdb --directory ./src/ --args ./bin/ecp.exe "test/src/" "test/dst"
+gdb --directory ./src/ --args ./bin/ecp.exe "/cygdrive/z/Android/" "test/dst"
