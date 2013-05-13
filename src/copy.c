@@ -507,7 +507,7 @@ void DoWork(struct DataNode *node)
 
     // check if the destination folder exists
     char *destfolder = dirname(node->destination, strlen(node->destination));
-    //printf("DOWORK: destfolder: %s\n",destfolder);
+   // printf("DOWORK: destfolder: %s %s\n",destfolder, node->destination);
 
     if (stat(destfolder, &fileDestination) == -1)
     {
@@ -586,16 +586,31 @@ void DoWork(struct DataNode *node)
 
 struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
-  //printf("ADDFILE: %s %d %s %d %s %d\n", src, lsrc, path, lpath, dst, ldst);
-  char *dstpath = (char*)malloc(sizeof(char*)*(lpath+ldst-lsrc+1));
-  if (dstpath==NULL)
+  char *dstpath;
+  if (lsrc == lpath && memcmp(src, path, lsrc) == 0)
   {
-    printf("AddFile: Failed to alloc memory (destination path)\n");
-    return NULL;
+    dstpath = (char*)malloc(sizeof(char*)*(lpath+ldst+1));
+    if (dstpath==NULL)
+    {
+      printf("AddFile: Failed to alloc memory (destination path)\n");
+      return NULL;
+    }
+    memcpy(dstpath, dst, ldst);
+    memcpy(dstpath+ldst, path, lpath);
+    dstpath[lpath+ldst] = 0;
   }
-  memcpy(dstpath, dst, ldst);
-  memcpy(dstpath+ldst, path+lsrc, lpath-lsrc);
-  dstpath[lpath+ldst-lsrc] = 0;
+  else
+  {
+    dstpath = (char*)malloc(sizeof(char*)*(lpath+ldst-lsrc+1));
+    if (dstpath==NULL)
+    {
+      printf("AddFile: Failed to alloc memory (destination path)\n");
+      return NULL;
+    }
+    memcpy(dstpath, dst, ldst);
+    memcpy(dstpath+ldst, path+lsrc, lpath-lsrc);
+    dstpath[lpath+ldst-lsrc] = 0;
+  }
 
   struct DataNode *node = (struct DataNode*)malloc(sizeof(struct DataNode));
   if (node==NULL)
@@ -615,13 +630,8 @@ struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, 
   node->source[lpath] = 0;
   node->destination = dstpath;
   node->next = NULL;
-
- // printf("Addfile: %s => %s\n", node->source, node->destination);
-
   return node;
 }
-
-//  /src/  /src/file1  /dst/
 
 void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
@@ -818,6 +828,37 @@ int main (int argc, char **argv)
       free(exe);
       return 1;
     }
+
+    // if just two arguments
+    if (argc == 3)
+    {
+      // and both are not dirs
+      struct stat fsrc;
+      struct stat fdst;
+      if (stat(argv[1], &fsrc) == 0 && S_ISREG(fsrc.st_mode))
+      {
+        bool bExist = (stat(argv[2], &fdst) == 0);
+        if ((bExist && S_ISREG(fdst.st_mode)) || !bExist)
+        {
+            int i = strlen(argv[1]);
+            struct DataNode node;
+            node.checksum = NULL;
+
+            node.source = (char*)malloc(sizeof(char*)*(i+1));
+            memcpy(node.source, argv[1], i);
+            node.source[i] = 0;
+            i = strlen(argv[2]);
+            node.destination = (char*)malloc(sizeof(char*)*(i+1));
+            memcpy(node.destination, argv[2], i);
+            node.destination[i] = 0;
+            DoWork(&node);
+            sighandler(0);
+            return 0;
+        }
+      }
+      
+    }
+
 
     int i;
     char *pDestinationPath = argv[--argc];

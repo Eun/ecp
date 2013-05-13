@@ -1,18 +1,15 @@
-TODO
-==============
+
 
 
 Usage
------
+=====
 
-ecp [-h <hashalgo>] <source>... <destination>
-
-Important
----------
+ecp [-cd -h <hashalgo>] <source>... <destination>
 
 
-Whishlist
----------
+TODO
+==============
+* src/* copy has some issues
 * Toggle Create Empty Directorys
-* Toggle checksum on/off
-* SHA1 Checksum
+* Choose which checksum to use: NONE, MD5, SHA1
+* delete files after successfull copied, aka move
