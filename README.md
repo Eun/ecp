@@ -1,10 +1,7 @@
-
-
-
 Usage
 =====
 
-ecp [-cd -h <hashalgo>] <source>... <destination>
+`ecp [-cd -h <hashalgo>] <source>... <destination>`
 
 
 TODO
