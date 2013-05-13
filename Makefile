@@ -9,7 +9,7 @@ OBJ = $(OBJC) $(OBJCPP)
 CFLAGS = -Wall -I./inc/ -g
 CPPFLAGS = -Wall -I./inc/ -g
 LDFLAGS = -Wall
-LIBS = -lpthread
+LIBS = -lpthread ../duma_2_5_15/libduma.a
 
 
 # ========================================================================= #

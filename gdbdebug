@@ -2,4 +2,5 @@
 #gdb --directory ./src/ --args ./bin/ecp.exe "Z:\Android" "C:\cygwin\home\gamer\ecp\test"
 #gdb --directory ./src/ --args ./bin/ecp.exe "test/src/" "test/dst"
 #gdb --directory ./src/ --args ./bin/ecp.exe "/cygdrive/z/Android/" "test/dst"
-gdb --directory ./src/ --args ./bin/ecp.exe  "/cygdrive/c/Users/salzmann/Desktop/de_windows_7_enterprise_with_sp1_x64_dvd_u_677649.iso" "/home/Salzmann/ecp/"
+#gdb --directory ./src/ --args ./bin/ecp.exe  "/cygdrive/c/Users/salzmann/Desktop/de_windows_7_enterprise_with_sp1_x64_dvd_u_677649.iso" "/home/Salzmann/ecp/"
+gdb --directory ./src/ --args ./bin/ecp.exe  test/source/root.zip test/dest/

@@ -1,4 +1,4 @@
-//#include "../../duma_2_5_15/duma.h"
+#include "../../duma_2_5_15/duma.h"
 #include <stdio.h>
 #include <unistd.h>
 #include "md5.h"
@@ -6,10 +6,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h> 
-#include <string.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <pthread.h>
+//#include <string.h>
 
 #ifndef false
   #define false 0
@@ -840,18 +840,53 @@ int main (int argc, char **argv)
         bool bExist = (stat(argv[2], &fdst) == 0);
         if ((bExist && S_ISREG(fdst.st_mode)) || !bExist)
         {
-            int i = strlen(argv[1]);
-            struct DataNode node;
-            node.checksum = NULL;
+            int nsrc = strlen(argv[1]);
+            struct DataNode *node = (struct DataNode*)malloc(sizeof(struct DataNode));
+            if (node==NULL)
+            {
+              printf("Main: Failed to alloc memory (DataNode)\n");
+              return NULL;
+            }
+            node->checksum = NULL;
+            node->source = (char*)malloc(sizeof(char*)*(nsrc+1));
+            if (node->source == NULL)
+            {
+              printf("Main: Failed to alloc memory (source)\n");
+              return NULL;
+            }
+            memcpy(node->source, argv[1], nsrc);
+            node->source[nsrc] = 0;
+            int ndst = strlen(argv[2]);
 
-            node.source = (char*)malloc(sizeof(char*)*(i+1));
-            memcpy(node.source, argv[1], i);
-            node.source[i] = 0;
-            i = strlen(argv[2]);
-            node.destination = (char*)malloc(sizeof(char*)*(i+1));
-            memcpy(node.destination, argv[2], i);
-            node.destination[i] = 0;
-            DoWork(&node);
+            if (argv[2][ndst-1] != '/')
+            {
+              node->destination = (char*)malloc(sizeof(char*)*(ndst+1));
+              if (node->destination == NULL)
+              {
+                printf("Main: Failed to alloc memory (destination)\n");
+                return NULL;
+              }
+              memcpy(node->destination, argv[2], ndst);
+              node->destination[ndst] = 0;
+            }
+            else
+            {
+              char *sbase = basename(argv[1],nsrc);
+              int nsbase = strlen(sbase);
+              node->destination = (char*)malloc(sizeof(char*)*(ndst+nsbase+1));
+              if (node->destination == NULL)
+              {
+                printf("Main: Failed to alloc memory (destination)\n");
+                return NULL;
+              }
+              memcpy(node->destination, argv[2], ndst);
+              memcpy(node->destination+ndst, sbase, nsbase);
+              node->destination[ndst+nsbase] = 0;
+            }
+            node->next = NULL;
+            
+            
+            DoWork(node);
             sighandler(0);
             return 0;
         }
