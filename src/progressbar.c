@@ -13,7 +13,7 @@ int getWidth()
     return w.ws_col;
 }
 
-void GetSpeed(int bytes, char *buffer)
+void GetSpeed(unsigned int bytes, char *buffer)
 {
 	char unit[] = "B/s ";
 	if (bytes > 1024)
@@ -83,7 +83,7 @@ char *dirname(char *in, int len)
 }
 
 
-void DrawProgressBar(double percent, double speed, char *file)
+void DrawProgressBar(double percent, unsigned int speed, char *file, char progresssign)
 {
 	int width = getWidth();
 	char speedbuffer[9];
@@ -154,7 +154,7 @@ void DrawProgressBar(double percent, double speed, char *file)
 
 			for (i = 3; i < p; i++)
 			{
-				putchar('=');	
+				putchar(progresssign);	
 			}
 			if (p < width_of_bar)
 			{

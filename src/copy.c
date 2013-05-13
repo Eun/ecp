@@ -7,17 +7,35 @@
 #include <dirent.h> 
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 
-
-void DrawProgressBar(double percent, double speed, char *file);
+void DrawProgressBar(double percent, unsigned int speed, char *file, char progresssign);
 char *basename(char *in, int len);
 char *dirname(char *in, int len);
 
 
-int fSize;
-int wSize;
+
+
+unsigned int fSize;
+unsigned int wSize;
+unsigned int dSpeed;
 char *ffile;
+pthread_t tSpeadMeassure;
+
+static void *SpeedMeasure(void *arg)
+{
+  unsigned int diff = 0;
+  dSpeed = 0;
+  while(wSize < fSize && dSpeed != fSize)
+  {
+    dSpeed = wSize-diff;
+    diff = wSize;
+    usleep(1000000);
+  }
+  return NULL;
+}
+
 
 void copy_process_block (const void *buffer, size_t len, FILE* dststream)
 {
@@ -28,9 +46,14 @@ void copy_process_block (const void *buffer, size_t len, FILE* dststream)
       printf("error on wrting to destination\n");
     }
   }
-  wSize+=len;
   if (ffile)
-    DrawProgressBar((double)100*wSize/fSize, 0.0, ffile);
+  {
+    wSize+=len;
+    if (dststream == NULL)
+      DrawProgressBar((double)100*wSize/fSize, dSpeed, ffile, '#');
+    else
+      DrawProgressBar((double)100*wSize/fSize, dSpeed, ffile, '=');
+  }
 
 }
 void copy_process_bytes (const void *buffer, size_t len, FILE* dststream)
@@ -48,7 +71,7 @@ ptr_align (void const *ptr, size_t alignment)
 
 
 
-unsigned char rawcopy(char *src, char *dst)
+unsigned char rawcopy(char *src, int filesize, char *dst)
 {
 
   FILE *fp, *fpdst;
@@ -68,13 +91,13 @@ unsigned char rawcopy(char *src, char *dst)
     return 0;
   }
 
-  fseek (fp , 0 , SEEK_END);
-  fSize = ftell (fp);
-  rewind (fp);
+  fSize = (unsigned int)filesize;
   ffile = src;
 
   fadvise (fp, FADVISE_SEQUENTIAL);
   char buffer[100];
+  dSpeed = fSize;
+  pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
   while(feof(fp)==0)
   {  
     int numr;
@@ -89,7 +112,7 @@ unsigned char rawcopy(char *src, char *dst)
     }
     copy_process_block(buffer,numr, fpdst);
   } 
-  DrawProgressBar(100, 0.0, src);
+  DrawProgressBar(100, dSpeed, src, '=');
 
 
   if (fclose (fpdst) != 0)
@@ -107,8 +130,9 @@ unsigned char rawcopy(char *src, char *dst)
 }
 
 
-unsigned char md5copy(char *src, char *dst, char *checksum)
+unsigned char md5copy(char *src, int filesize, char *dst, char *checksum)
 {
+   //__asm__("int3");
   unsigned char bin_buffer_unaligned[20];
   unsigned char *bin_buffer = ptr_align (bin_buffer_unaligned, 4);
 
@@ -121,35 +145,30 @@ unsigned char md5copy(char *src, char *dst, char *checksum)
   {
    printf("error on opening: %s", src);
    return 0;
- }
-
- if (dst != NULL)
- {
-  fpdst = fopen (dst, "wb");
-  if (fp == NULL)
-  {
-    fclose(fp);
-    printf("error on opening: %s", dst);
-    return 0;
   }
 
-  ffile = src;
-  fseek (fp , 0 , SEEK_END);
-  fSize = ftell (fp);
-  rewind (fp);
+  if (dst != NULL)
+  {
+   fpdst = fopen (dst, "wb");
+   if (fp == NULL)
+   {
+     fclose(fp);
+     printf("error on opening: %s", dst);
+     return 0;
+   }
+  }
+  else
+  {
+    fpdst = NULL;
+  }
+  fSize = (unsigned int)filesize;
   wSize = 0;
-
-
-}
-else
-{
-  fpdst = NULL;
-  fSize = -1;
-}
+  ffile = src;
 
 
 fadvise (fp, FADVISE_SEQUENTIAL);
-
+dSpeed = fSize;
+pthread_create(&  tSpeadMeassure, NULL, &SpeedMeasure, NULL);
 err = md5_stream(fp, fpdst, bin_buffer);
 if (err)
 {
@@ -159,8 +178,10 @@ if (err)
 }
 if (fpdst)
 {
-  DrawProgressBar(100, 0.0, src);
+  DrawProgressBar(100, dSpeed, src, '=');
 }
+else
+  DrawProgressBar(100, dSpeed, src, '#');
 
 if (fclose (fpdst) != 0)
 {
@@ -186,29 +207,11 @@ for (i = 0; i < 16 ; ++i, j+=2)
 return 1;
 }
 
-unsigned char md5sum(char *src, char *checksum)
+unsigned char md5sum(char *src, int filesize, char *checksum)
 {
-  return md5copy(src, NULL, checksum);
+  return md5copy(src, filesize, NULL, checksum);
 }
 
-int GetFileType(char *target)
-{
-  struct stat st;
-  if(stat(target,&st) == 0)
-  {
-    if(S_ISDIR(st.st_mode))
-    {
-     return -1; // folder
-   }
-   else if(S_ISREG(st.st_mode))
-   {
-     return st.st_size; // file
-   }
-   else
-    return -2; // unknown file
-}
- return -3; // stat failed
-}
 
 unsigned char mkdir_p(char *folder, size_t len)
 {
@@ -227,7 +230,8 @@ unsigned char mkdir_p(char *folder, size_t len)
 
       memcpy(pst, folder, i);
       pst[i] = 0;
-      if (GetFileType(pst) == -3)
+      struct stat st;
+      if (stat(pst,&st) == -1)
       {
         if (mkdir(pst,0644) != 0)
         {
@@ -248,8 +252,8 @@ char *TargetPreCheck(char *target, int numfiles)
 {
   int len = strlen(target);
   
-  int FileType = GetFileType(target);
-  if (FileType == -3)
+  struct stat FileType;
+  if (stat(target,&FileType) == -1)
   {
 
     // ecp file1 file2 folder(/)
@@ -331,7 +335,7 @@ else
   return newtarget;
 }
 }
-else if (FileType == -1)
+else if (S_ISDIR(FileType.st_mode)) // FOLDER
 {
  if (target[len-1] != '/')
  {
@@ -359,7 +363,7 @@ else
   return newtarget;
 }
 }  
-else if (FileType > 0)
+else if (S_ISREG(FileType.st_mode)) // FILE
 {
   if (numfiles > 1)
   {
@@ -418,6 +422,7 @@ void FreeNodeContents(struct DataNode *node)
 
 void DoWork(struct DataNode *node)
 {
+  struct DataNode *firstNode = node;
   while (node)
   {
     if (!node->destination || !node->source)
@@ -426,12 +431,16 @@ void DoWork(struct DataNode *node)
       continue;
     }
 
-    //printf("DOWORK: destfolder: %s => %s\n",node->source, node->destination);
 
-    int filesize = GetFileType(node->destination);
-    if (filesize > 0)
+    struct stat fileDestination;
+    struct stat fileSource;
+    if (stat(node->source, &fileSource) == -1)
     {
-     if (GetFileType(node->source) == filesize)
+      continue;
+    }
+    if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
+    {
+     if (fileDestination.st_size == fileSource.st_size)
      {
        char *checksum = (char*)malloc(sizeof(char)*32);
        if (checksum==NULL)
@@ -447,12 +456,13 @@ void DoWork(struct DataNode *node)
        }
        //printf("Comparing Checksums (%s == %s)\n",node->destination, node->source);
       // __asm__("int3");
-       md5sum(node->source, node->checksum); 
-       md5sum(node->destination, checksum); 
+       md5sum(node->source, fileSource.st_size, node->checksum); 
+       md5sum(node->destination, fileDestination.st_size, checksum); 
        if (memcmp(checksum, node->checksum, 32) == 0)
        {
          free(checksum);
-         printf("Skipping %s\n", node->source);
+         //printf("Skipping %s\n", node->source);
+         DrawProgressBar(100, fileDestination.st_size, ffile, '-');
          FreeNodeContents(node);
          continue; 
        }
@@ -460,11 +470,11 @@ void DoWork(struct DataNode *node)
      }
     }
 
-
     // check if the destination folder exists
     char *destfolder = dirname(node->destination, strlen(node->destination));
     //printf("DOWORK: destfolder: %s ,%d, (%d)\n",destfolder, strlen(node->destination), GetFileType(destfolder));
-    if (GetFileType(destfolder) != -1)
+
+    if (stat(destfolder, &fileDestination) == -1)
     {
       //printf("Creating %s\n", destfolder);
       if (mkdir_p(destfolder, strlen(destfolder)) == 0)
@@ -484,22 +494,24 @@ void DoWork(struct DataNode *node)
         return;
       }
       //DrawProgressBar(, 962486234, node->source);
-      printf("%s => %s\n", node->source, node->destination);
-      //md5copy(node->source,  node->destination, node->checksum); 
+      //printf("%s => %s\n", node->source, node->destination);
+      md5copy(node->source,  fileSource.st_size, node->destination, node->checksum); 
+      //printf("%s => %s (%s)\n", node->source, node->destination, node->checksum);
     }
     else
     {
-      rawcopy(node->source,  node->destination);
+      rawcopy(node->source, fileSource.st_size, node->destination);
     }
     puts("");
     node = node->next;
   }
   // after copying, check everything
+  node = firstNode;
   while (node)
   {
     if (node->checksum != NULL)
     {
-      printf("\rComparing Checksums (%s)",node->destination);
+      struct stat fileDestination;
       char *checksum = (char*)malloc(sizeof(char)*32);
       if (checksum==NULL)
       {
@@ -507,7 +519,10 @@ void DoWork(struct DataNode *node)
         return;
       }
   
-      md5sum(node->destination, checksum); 
+      if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
+      {
+       md5sum(node->destination, fileDestination.st_size, checksum); 
+      }
       if (memcmp(node->checksum, checksum, 32) != 0)
       {
         printf("Checksum for '%s' failed\n", node->source);
@@ -615,8 +630,9 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
       memcpy(folder+lpath+appendslash, dir->d_name, len2);
       folder[lfolder] = 0;
 
-      int ft = GetFileType(folder);
-      if (ft == -1)
+      struct stat ft;
+      stat(folder, &ft);
+      if (S_ISDIR(ft.st_mode))
       {
         char *subdst = basename(path, lpath-((appendslash) ? 0 : 1));
         int lsubdst = strlen(subdst);
@@ -638,7 +654,7 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
         AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, ndst, lndst);
         free(ndst);
       }
-      else
+      else if (S_ISREG(ft.st_mode))
       {
         newnode = AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
         if (newnode)
@@ -730,13 +746,17 @@ int main (int argc, char **argv)
     struct DataNode *newnode;
     for (i = 0; i < argc; i++)
     {
-      int ft = GetFileType(argv[i+1]);
+      struct stat ft;
+      if (stat(argv[i+1], &ft) == -1)
+      {
+        continue;
+      }
       int len = strlen(argv[i+1]);
-      if (ft == -1)
+      if (S_ISDIR(ft.st_mode))
       {
         AddFolder(argv[i+1], len, argv[i+1], len, target, ltarget);
       }
-      else
+      else if(S_ISREG(ft.st_mode))
       {
         char *sdir = dirname(argv[i+1], len);
         newnode = AddFile(sdir, strlen(sdir), argv[i+1], len, target, ltarget);

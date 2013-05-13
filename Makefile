@@ -9,7 +9,7 @@ OBJ = $(OBJC) $(OBJCPP)
 CFLAGS = -Wall -I./inc/ -g
 CPPFLAGS = -Wall -I./inc/ -g
 LDFLAGS = -Wall
-LIBS = 
+LIBS = -lpthread
 
 
 # ========================================================================= #
