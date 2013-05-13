@@ -2,9 +2,13 @@ TODO
 ==============
 
 
+Usage
+-----
+
+ecp [-h <hashalgo>] <source>... <destination>
+
 Important
 ---------
-* Progressbar on generating checksum
 
 
 Whishlist

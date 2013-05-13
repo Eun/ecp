@@ -1,3 +1,4 @@
+//#include "../../duma_2_5_15/duma.h"
 #include <stdio.h>
 #include <unistd.h>
 #include "md5.h"
@@ -7,15 +8,31 @@
 #include <dirent.h> 
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <pthread.h>
+
+#ifndef false
+  #define false 0
+#endif
+#ifndef true
+  #define true 1
+#endif
+#ifndef bool
+  typedef unsigned char bool;
+#endif
+
 
 
 void DrawProgressBar(double percent, unsigned int speed, char *file, char progresssign);
 char *basename(char *in, int len);
 char *dirname(char *in, int len);
+int getWidth();
 
+unsigned long nChecksumErrors;
+unsigned long nTotalFilesCopied;
+unsigned long nTotalFiles;
 
-
+char *pDestinationPath;
 
 unsigned int fSize;
 unsigned int wSize;
@@ -27,7 +44,8 @@ static void *SpeedMeasure(void *arg)
 {
   unsigned int diff = 0;
   dSpeed = 0;
-  while(wSize < fSize && dSpeed != fSize)
+  pthread_t myID = pthread_self();
+  while(wSize < fSize && tSpeadMeassure == myID)
   {
     dSpeed = wSize-diff;
     diff = wSize;
@@ -71,7 +89,7 @@ ptr_align (void const *ptr, size_t alignment)
 
 
 
-unsigned char rawcopy(char *src, int filesize, char *dst)
+bool rawcopy(char *src, int filesize, char *dst)
 {
 
   FILE *fp, *fpdst;
@@ -80,7 +98,7 @@ unsigned char rawcopy(char *src, int filesize, char *dst)
   if (fp == NULL)
   {
     printf("error on opening: %s", src);
-    return 0;
+    return false;
   }
 
   fpdst = fopen (dst, "wb");
@@ -88,7 +106,7 @@ unsigned char rawcopy(char *src, int filesize, char *dst)
   {
     fclose(fp);
     printf("error on opening: %s", dst);
-    return 0;
+    return false;
   }
 
   fSize = (unsigned int)filesize;
@@ -119,18 +137,18 @@ unsigned char rawcopy(char *src, int filesize, char *dst)
   {
     fclose(fp);
     printf("error on close: %s", dst);
-    return 0;
+    return false;
   }
   if (fclose (fp) != 0)
   {
     printf("error on close: %s", src);
-    return 0;
+    return false;
   }
-  return 1;
+  return true;
 }
 
 
-unsigned char md5copy(char *src, int filesize, char *dst, char *checksum)
+bool md5copy(char *src, int filesize, char *dst, unsigned char *checksum)
 {
    //__asm__("int3");
   unsigned char bin_buffer_unaligned[20];
@@ -144,7 +162,7 @@ unsigned char md5copy(char *src, int filesize, char *dst, char *checksum)
   if (fp == NULL)
   {
    printf("error on opening: %s", src);
-   return 0;
+   return false;
   }
 
   if (dst != NULL)
@@ -154,7 +172,7 @@ unsigned char md5copy(char *src, int filesize, char *dst, char *checksum)
    {
      fclose(fp);
      printf("error on opening: %s", dst);
-     return 0;
+     return false;
    }
   }
   else
@@ -168,13 +186,13 @@ unsigned char md5copy(char *src, int filesize, char *dst, char *checksum)
 
 fadvise (fp, FADVISE_SEQUENTIAL);
 dSpeed = fSize;
-pthread_create(&  tSpeadMeassure, NULL, &SpeedMeasure, NULL);
+pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
 err = md5_stream(fp, fpdst, bin_buffer);
 if (err)
 {
   printf("error on copy: %s", src);
   fclose (fp);
-  return 0;
+  return false;
 }
 if (fpdst)
 {
@@ -187,33 +205,36 @@ if (fclose (fpdst) != 0)
 {
   fclose(fp);
   printf("error on close: %s", dst);
-  return 0;
+  return false;
 }
 if (fclose (fp) != 0)
 {
   printf("error on close: %s", src);
-  return 0;
+  return false;
 }
 
 
-int i;
+/*int i;
 int j = 0;
 memset(checksum, 0, 32);
 for (i = 0; i < 16 ; ++i, j+=2)
 {
   sprintf(checksum+j,"%02x", bin_buffer[i]);
+  checksum[j] = 0;
+}*/
+
+memcpy(checksum, bin_buffer, 16);
+
+return true;
 }
 
-return 1;
-}
-
-unsigned char md5sum(char *src, int filesize, char *checksum)
+bool md5sum(char *src, int filesize, char *checksum)
 {
   return md5copy(src, filesize, NULL, checksum);
 }
 
 
-unsigned char mkdir_p(char *folder, size_t len)
+bool mkdir_p(char *folder, size_t len)
 {
   int i;
   for (i = 0; i < len; i++)
@@ -225,7 +246,7 @@ unsigned char mkdir_p(char *folder, size_t len)
       if (pst==NULL)
       {
         printf("mkdir_p: Failed to alloc memory (destination)\n");
-        return 0;
+        return false;
       }
 
       memcpy(pst, folder, i);
@@ -236,14 +257,14 @@ unsigned char mkdir_p(char *folder, size_t len)
         if (mkdir(pst,0644) != 0)
         {
           free(pst);
-          return 0;
+          return false;
         }
       }
       free(pst);
       i++;
     }
   }
-  return 1;
+  return true;
 }
 
 
@@ -394,7 +415,7 @@ else
 
 struct DataNode
 {
-  char *checksum;
+  unsigned char *checksum;
   char *source;
   char *destination;
   struct DataNode *next;
@@ -419,6 +440,14 @@ void FreeNodeContents(struct DataNode *node)
   }
 }
 
+void JumpAndFree(struct DataNode **node, bool freeNode)
+{
+  struct DataNode *nnode = (*node)->next;
+  FreeNodeContents(*node);
+  if (freeNode)
+    free(*node);
+  *node = nnode;
+}
 
 void DoWork(struct DataNode *node)
 {
@@ -427,28 +456,33 @@ void DoWork(struct DataNode *node)
   {
     if (!node->destination || !node->source)
     {
-      node = node->next;
+      JumpAndFree(&node, false);
       continue;
     }
+
+    nTotalFiles++;
 
 
     struct stat fileDestination;
     struct stat fileSource;
+    //printf("stat of %s\n", node->source);
     if (stat(node->source, &fileSource) == -1)
     {
+      JumpAndFree(&node, false);
       continue;
     }
+    //printf("stat of %s..ok\n", node->source);
     if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
     {
      if (fileDestination.st_size == fileSource.st_size)
      {
-       char *checksum = (char*)malloc(sizeof(char)*32);
+       unsigned char *checksum = (unsigned char*)malloc(sizeof(unsigned char*)*16);
        if (checksum==NULL)
        {
          printf("DoWork: Failed to alloc memory (checksum)\n");
          return;
        }
-       node->checksum = (char*)malloc(sizeof(char)*32);
+       node->checksum = (unsigned char*)malloc(sizeof(unsigned char)*16);
        if (node->checksum==NULL)
        {
          printf("DoWork: Failed to alloc memory (node-checksum)\n");
@@ -458,12 +492,13 @@ void DoWork(struct DataNode *node)
       // __asm__("int3");
        md5sum(node->source, fileSource.st_size, node->checksum); 
        md5sum(node->destination, fileDestination.st_size, checksum); 
-       if (memcmp(checksum, node->checksum, 32) == 0)
+       if (memcmp(checksum, node->checksum, 16) == 0)
        {
          free(checksum);
          //printf("Skipping %s\n", node->source);
          DrawProgressBar(100, fileDestination.st_size, ffile, '-');
-         FreeNodeContents(node);
+         //puts("");
+         JumpAndFree(&node, false);
          continue; 
        }
        free(checksum);
@@ -472,7 +507,7 @@ void DoWork(struct DataNode *node)
 
     // check if the destination folder exists
     char *destfolder = dirname(node->destination, strlen(node->destination));
-    //printf("DOWORK: destfolder: %s ,%d, (%d)\n",destfolder, strlen(node->destination), GetFileType(destfolder));
+    //printf("DOWORK: destfolder: %s\n",destfolder);
 
     if (stat(destfolder, &fileDestination) == -1)
     {
@@ -486,7 +521,7 @@ void DoWork(struct DataNode *node)
 
     if (node->checksum == NULL)
     {
-      node->checksum = (char*)malloc(sizeof(char)*32);
+      node->checksum = (unsigned char*)malloc(sizeof(unsigned char*)*16);
 
       if (node->checksum==NULL)
       {
@@ -502,7 +537,8 @@ void DoWork(struct DataNode *node)
     {
       rawcopy(node->source, fileSource.st_size, node->destination);
     }
-    puts("");
+    nTotalFilesCopied++;
+    //puts("");
     node = node->next;
   }
   // after copying, check everything
@@ -512,7 +548,7 @@ void DoWork(struct DataNode *node)
     if (node->checksum != NULL)
     {
       struct stat fileDestination;
-      char *checksum = (char*)malloc(sizeof(char)*32);
+      unsigned char *checksum = (unsigned char*)malloc(sizeof(unsigned char*)*16);
       if (checksum==NULL)
       {
         printf("DoWork: Failed to alloc memory (checksum)\n");
@@ -521,18 +557,28 @@ void DoWork(struct DataNode *node)
   
       if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
       {
-       md5sum(node->destination, fileDestination.st_size, checksum); 
+        md5sum(node->destination, fileDestination.st_size, checksum); 
       }
-      if (memcmp(node->checksum, checksum, 32) != 0)
+      if (memcmp(node->checksum, checksum, 16) != 0)
       {
-        printf("Checksum for '%s' failed\n", node->source);
+        printf("Mismatching Checksum! '%s' (", node->source);
+        int i,j;
+        for (i = 0, j = 0; i < 16 ; ++i, j+=2)
+        {
+          printf("%02x", node->checksum[i]);
+        }
+        printf(") not matches '%s' (",node->destination);
+        for (i = 0, j = 0; i < 16 ; ++i, j+=2)
+        {
+          printf("%02x", checksum[i]);
+        }
+        printf(")\n");
+        nChecksumErrors++;
       }
       free(checksum);
     }
-    struct DataNode *nnode = node->next;
-    FreeNodeContents(node);
-    free(node);
-    node = nnode;
+    JumpAndFree(&node, true);
+    //node = node->next;
   }
 }
 
@@ -540,6 +586,7 @@ void DoWork(struct DataNode *node)
 
 struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
+  //printf("ADDFILE: %s %d %s %d %s %d\n", src, lsrc, path, lpath, dst, ldst);
   char *dstpath = (char*)malloc(sizeof(char*)*(lpath+ldst-lsrc+1));
   if (dstpath==NULL)
   {
@@ -551,8 +598,13 @@ struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, 
   dstpath[lpath+ldst-lsrc] = 0;
 
   struct DataNode *node = (struct DataNode*)malloc(sizeof(struct DataNode));
+  if (node==NULL)
+  {
+    printf("AddFile: Failed to alloc memory (DataNode)\n");
+    return NULL;
+  }
   node->checksum = NULL;
-  node->source = (char*)malloc(sizeof(char*)*(lsrc+1));
+  node->source = (char*)malloc(sizeof(char*)*(lpath+1));
   if (node->source==NULL)
   {
     printf("AddFile: Failed to alloc memory (source path)\n");
@@ -563,6 +615,9 @@ struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, 
   node->source[lpath] = 0;
   node->destination = dstpath;
   node->next = NULL;
+
+ // printf("Addfile: %s => %s\n", node->source, node->destination);
+
   return node;
 }
 
@@ -570,7 +625,7 @@ struct DataNode* AddFile(char *src, int lsrc, char *path, int lpath, char *dst, 
 
 void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 {
-  //printf("Building FileList.(%s)..\n", path);
+ // printf("ADDFOLDER %s %d %s %d %s %d\n", src, lsrc, path, lpath, dst, ldst);
   struct DataNode *firstNode = NULL;
   struct DataNode *node;
   struct DataNode *newnode;
@@ -597,6 +652,70 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 
       //printf("Adding slash to %s\n", src);
     }
+
+
+    // loop trough all files 
+    while ((dir = readdir(d)) != NULL)
+    {
+      int len2 = strlen(dir->d_name);
+
+
+      if ((len2 == 1 && dir->d_name[0] == '.') || (len2 == 2 && dir->d_name[0] == '.' && dir->d_name[1] == '.'))
+      {
+        continue;
+      }
+
+      //printf("%s => %s => ", path, dir->d_name);
+
+      unsigned char appendslash = 0;
+      int lfullFilePath = lpath+len2+1;
+      //printf("%d\n", lfolder);
+      char *fullFilePath = (char*)malloc(sizeof(char)*(lfullFilePath+1));
+
+      if (fullFilePath==NULL)
+      {
+        printf("AddFolder: Failed to alloc memory (fullFilePath)\n");
+        closedir(d);
+        return;
+      }
+      memcpy(fullFilePath, path, lpath); 
+      if (path[lpath-1] != '/')
+      {
+        fullFilePath[lpath] = '/';
+        appendslash = 1;
+      }
+      else
+      {
+        lfullFilePath--;
+      }
+      memcpy(fullFilePath+lpath+appendslash, dir->d_name, len2);
+      fullFilePath[lfullFilePath] = 0;
+
+      //printf("%s\n", fullFilePath);
+
+      struct stat ft;
+      stat(fullFilePath, &ft);
+      if (S_ISREG(ft.st_mode))
+      {
+        newnode = AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, fullFilePath, lfullFilePath, dst, ldst);
+        if (newnode)
+        {
+          if (firstNode == NULL)
+            firstNode = newnode;
+          else
+            node->next = newnode;
+          node = newnode;
+        }
+      }
+      free(fullFilePath);
+    }
+
+    // do the work for the files
+    //printf("DOWRK FOR FILES\n");
+    DoWork(firstNode);
+
+    rewinddir(d);
+    // loop trough all folders
     while ((dir = readdir(d)) != NULL)
     {
       int len2 = strlen(dir->d_name);
@@ -607,66 +726,55 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
       }
 
       unsigned char appendslash = 0;
-      int lfolder = lpath+len2+1;
-      printf("%d\n", lfolder);
-      char *folder = (char*)malloc(sizeof(char)*(lfolder+1));
+      int lfullFolderPath = lpath+len2+1;
+      //printf("%d\n", lfolder);
+      char *fullFolderPath = (char*)malloc(sizeof(char)*(lfullFolderPath+1));
 
-      if (folder==NULL)
+      if (fullFolderPath==NULL)
       {
-        printf("AddFolder: Failed to alloc memory (destination folder)\n");
+        printf("AddFolder: Failed to alloc memory (fullFolderPath)\n");
         closedir(d);
         return;
       }
-      memcpy(folder, path, lpath); 
+      memcpy(fullFolderPath, path, lpath); 
       if (path[lpath-1] != '/')
       {
-        folder[lpath] = '/';
+        fullFolderPath[lpath] = '/';
         appendslash = 1;
       }
       else
       {
-        lfolder--;
+        lfullFolderPath--;
       }
-      memcpy(folder+lpath+appendslash, dir->d_name, len2);
-      folder[lfolder] = 0;
+      memcpy(fullFolderPath+lpath+appendslash, dir->d_name, len2);
+      fullFolderPath[lfullFolderPath] = 0;
 
       struct stat ft;
-      stat(folder, &ft);
+      stat(fullFolderPath, &ft);
       if (S_ISDIR(ft.st_mode))
       {
-        char *subdst = basename(path, lpath-((appendslash) ? 0 : 1));
-        int lsubdst = strlen(subdst);
-        int lndst = ldst+lsubdst+1;
-        char *ndst = (char*)malloc(sizeof(char*)*(lndst+1));
+        //char *subdst = basename(path, lpath-((appendslash) ? 0 : 1));
+        //int lsubdst = strlen(subdst);
+        //int lndst = ldst+lsubdst+1;
+        //char *ndst = (char*)malloc(sizeof(char*)*(lndst+1));
 
-        if (ndst==NULL)
-        {
-          printf("AddFolder: Failed to alloc memory (new destination)\n");
-          closedir(d);
-          return;
-        }
+        //if (ndst==NULL)
+        //{
+        //  printf("AddFolder: Failed to alloc memory (new destination)\n");
+        //  closedir(d);
+        //  return;
+        //}
 
-        memcpy(ndst, dst, ldst);
-        memcpy(ndst+ldst, subdst, lsubdst);
-        ndst[lndst-1] = '/';
-        ndst[lndst] = 0;
-        free(subdst);
-        AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, ndst, lndst);
-        free(ndst);
+        //memcpy(ndst, dst, ldst);
+        //memcpy(ndst+ldst, subdst, lsubdst);
+        //ndst[lndst-1] = '/';
+        //ndst[lndst] = 0;
+        //free(subdst);
+        
+        AddFolder((srcWithSlash) ? srcWithSlash : src, lsrc, fullFolderPath, lfullFolderPath, dst, ldst);
+        //free(ndst);
       }
-      else if (S_ISREG(ft.st_mode))
-      {
-        newnode = AddFile((srcWithSlash) ? srcWithSlash : src, lsrc, folder, lfolder, dst, ldst);
-        if (newnode)
-        {
-          if (firstNode == NULL)
-            firstNode = newnode;
-          else
-            node->next = newnode;
-          node = newnode;
-        }
-      }
-      free(folder);
+      free(fullFolderPath);
     }
 
     if (srcWithSlash != NULL)
@@ -676,28 +784,19 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 
     closedir(d);
   }
-
-  //printf("Building FileList.(%s)..Done\n", path);
-
-  //printf("Doing WORK.(%s)..\n", path);
-  DoWork(firstNode);
-  //printf("Doing WORK.(%s)..Done\n", path);
-
-  // cleanup
-  //printf("Cleaning up.(%s)..\n", path);
-  /*node = firstNode;
-  while (node != NULL) 
-  {
-    struct DataNode *nnode = node->next;
-    FreeNodeContents(node);
-    free(node);
-    node = nnode;
-  }*/
-  //printf("Cleaning up.(%s)..Done\n", path);
-
-
 }
 
+
+void sighandler( int sig )
+{
+  int i;
+  putchar('\r');
+  for (i = getWidth(); i > 0; i--)
+      putchar(' ');
+  printf("\rDone:  Files read:        %lu\n       Files copied:      %lu\n       Checksum errors:   %lu\n", nTotalFiles, nTotalFilesCopied, nChecksumErrors);
+  free(pDestinationPath);
+  exit(0);
+}
 
 
 // ecp file file
@@ -707,19 +806,10 @@ void AddFolder(char* src, int lsrc, char *path, int lpath, char *dst, int ldst)
 // ecp file1 file2 folder/ // folder musn't exist
 int main (int argc, char **argv)
 {
- 
-  // test progressbar
-  /*
-  {
-    double i;
-    for (i = 0; i <= 100; i+=0.5f)
-    {
-      DrawProgressBar(i, 962486234, argv[1]);
-      usleep(10000);
-      }
-    return 1;
-  }*/
-
+  signal(SIGABRT, &sighandler);
+  signal(SIGTERM, &sighandler);
+  signal(SIGINT, &sighandler);
+    nTotalFiles = nTotalFilesCopied = nChecksumErrors = 0;
     if (argc < 3)
     {
       // todo: basename
@@ -730,16 +820,16 @@ int main (int argc, char **argv)
     }
 
     int i;
-    char *target = argv[--argc];
+    char *pDestinationPath = argv[--argc];
 
-    target = TargetPreCheck(target, argc--);
-    if (target == NULL)
+    pDestinationPath = TargetPreCheck(pDestinationPath, argc--);
+    if (pDestinationPath == NULL)
     {
       return 1;
     }
 
     //printf("Building FileList.(Main)..\n");
-    int ltarget = strlen(target);
+    int ltarget = strlen(pDestinationPath);
 
     struct DataNode *firstNode = NULL;
     struct DataNode *node;
@@ -754,12 +844,12 @@ int main (int argc, char **argv)
       int len = strlen(argv[i+1]);
       if (S_ISDIR(ft.st_mode))
       {
-        AddFolder(argv[i+1], len, argv[i+1], len, target, ltarget);
+        AddFolder(argv[i+1], len, argv[i+1], len, pDestinationPath, ltarget);
       }
       else if(S_ISREG(ft.st_mode))
       {
         char *sdir = dirname(argv[i+1], len);
-        newnode = AddFile(sdir, strlen(sdir), argv[i+1], len, target, ltarget);
+        newnode = AddFile(sdir, strlen(sdir), argv[i+1], len, pDestinationPath, ltarget);
         free(sdir);
         if (newnode)
         {
@@ -771,23 +861,8 @@ int main (int argc, char **argv)
         }
       }
     }
-    //printf("Building FileList.(Main)..Done\n");
-
-    //printf("Doing WORK.(Main)..\n");
     DoWork(firstNode);
-    //printf("Doing WORK.(Main)..Done\n");
 
-  // cleanup
-    //printf("Cleaning up.(Main)..\n");
-    /*node = firstNode;
-    while (node != NULL) 
-    {
-      struct DataNode *nnode = node->next;
-      FreeNodeContents(node);
-      free(node);
-      node = nnode;
-    }*/
-    //printf("Cleaning up.(Main)..Done\n");
-    free(target);
+    sighandler(0);
     return 0;
   }

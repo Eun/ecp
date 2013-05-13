@@ -15,7 +15,7 @@ int getWidth()
 
 void GetSpeed(unsigned int bytes, char *buffer)
 {
-	char unit[] = "B/s ";
+	char unit[5] = "B/s";
 	if (bytes > 1024)
 	{
 		bytes = bytes / 1024;
@@ -37,7 +37,10 @@ void GetSpeed(unsigned int bytes, char *buffer)
 		strcpy(unit, "TB/s");
 	}
 	memset(buffer, 0, 9);
-	sprintf(buffer, "%4d%s", bytes, unit);
+	if (strlen(unit) == 3)
+		sprintf(buffer, " %4d%s", bytes, unit);
+	else
+		sprintf(buffer, "%4d%s", bytes, unit);
 }
 
 
