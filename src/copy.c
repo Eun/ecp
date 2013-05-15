@@ -522,7 +522,7 @@ int main (int argc, char **argv)
 	if (argc < 3)
 	{
 		char *exe = basename(argv[0], strlen(argv[0]));
-		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION could be:\n -h=HASHALGO      decide which hash algorithm should be used\n                  HASHALGO could be NONE, CRC32, MD5, SHA1. Default is MD5\n -d               create empty directorys\n", exe);
+		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION can be:\n -h=HASHALGO      decide which hash algorithm should be used.\n                    HASHALGO can be:\n                      NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.\n                    Default is MD5\n -d               create empty directorys\n", exe);
 		free(exe);
 		return 1;
 	}
