@@ -1,12 +1,13 @@
 Usage
 =====
-
-`ecp [-cd -h <hashalgo>] <source>... <destination>`
+    usage: ecp [OPTION] SOURCE... DESTINATION
+    
+    OPTION could be:
+     -h=HASHALGO      decide which hash algorithm should be used
+                      HASHALGO could be NONE, CRC32, MD5, SHA1. Default is MD5
+     -d               create empty directorys
 
 
 TODO
 ==============
-* src/* copy has some issues
-* Toggle Create Empty Directorys
-* Choose which checksum to use: NONE, MD5, SHA1
 * delete files after successfull copied, aka move

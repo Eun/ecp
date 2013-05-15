@@ -32,14 +32,6 @@
 # if __BYTE_ORDER == __BIG_ENDIAN
 #  define WORDS_BIGENDIAN 1
 # endif
-/* We need to keep the namespace clean so define the MD5 function
-   protected using leading __ .  */
-# define md5_init_ctx __md5_init_ctx
-# define md5_process_block __md5_process_block
-# define md5_process_bytes __md5_process_bytes
-# define md5_finish_ctx __md5_finish_ctx
-# define md5_read_ctx __md5_read_ctx
-# define md5_stream __md5_stream
 #endif
 
 #ifdef WORDS_BIGENDIAN
@@ -146,6 +138,7 @@ md5_stream (FILE *stream, FILE *dststream, void *resblock)
   /* Iterate over full file contents.  */
   while (1)
     {
+
       /* We read the file in blocks of BLOCKSIZE bytes.  One call of the
          computation function processes the whole buffer so that with the
          next round of the loop another block can be read.  */

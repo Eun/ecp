@@ -22,9 +22,13 @@ struct HASHALGOCOL
 	void (* printfunc)();
 } m_hashalgocol[] = {
 	{"NONE", rawcopy, NULL, NULL, NULL},
-	{"CRC32", rawcopy, NULL, NULL, NULL},
+	//{"CRC32", rawcopy, NULL, NULL, NULL},
 	{"MD5", md5copy, md5sum, md5cmp, md5print},
-	{"SHA1", rawcopy, NULL, NULL, NULL}
+	{"SHA1", sha1copy, sha1sum, sha1cmp, sha1print},
+	{"SHA224", sha224copy, sha224sum, sha224cmp, sha224print},
+	{"SHA256", sha256copy, sha256sum, sha256cmp, sha256print},
+	{"SHA384", sha384copy, sha384sum, sha384cmp, sha384print},
+	{"SHA512", sha512copy, sha512sum, sha512cmp, sha512print}
 };
 
 void DrawProgressBar(double percent, unsigned int speed, char *file, char progresssign);
@@ -207,7 +211,7 @@ void DoWork(struct DataNode *node)
 
 		if (stat(destfolder, &fileDestination) == -1)
 		{
-			if (mkdir_p(destfolder, strlen(destfolder)) == 0)
+			if (mkdir_p(destfolder, 0777) == 0)
 			{
 				printf("skipping '%s' could not create destination folder\n", node->source);
 			}
@@ -237,6 +241,11 @@ void DoWork(struct DataNode *node)
 	
 			if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
 			{
+				ffile = node->destination;
+				fSize = (unsigned int)fileDestination.st_size;
+				dSpeed = fSize;
+				wSize = 0;
+				pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
 				pHashAlgo->sumfunc(node->destination, &checksum); 
 			}
 			if (pHashAlgo->cmpfunc(node->checksum, checksum) == false)
@@ -288,6 +297,7 @@ void AddFolder(char* src, int lsrc, char *dst, int ldst)
 	struct DataNode *node;
 	DIR           *d;
 	struct dirent *dir;
+	bool bAdded = false;
 
 	d = opendir(src);
 	if (d)
@@ -383,6 +393,7 @@ void AddFolder(char* src, int lsrc, char *dst, int ldst)
 					else
 						node->next = newnode;
 					node = newnode;
+					bAdded = true;
 				}
 				else
 				{
@@ -448,6 +459,7 @@ void AddFolder(char* src, int lsrc, char *dst, int ldst)
 				fullTargetPath[lfullTargetPath] = 0;
 				AddFolder(fullSourcePath, lfullSourcePath, fullTargetPath, lfullTargetPath);
 				free(fullTargetPath);
+				bAdded = true;
 			}
 			free(fullSourcePath);
 
@@ -455,6 +467,14 @@ void AddFolder(char* src, int lsrc, char *dst, int ldst)
 		free(srcWithSlash);
 
 		closedir(d);
+	}
+	if (!bAdded && bCreateEmptyDir)
+	{
+		struct stat fdst;
+		if (stat(dst, &fdst) == -1)
+		{
+			mkdir_p(dst, 0777);
+		}
 	}
 }
 
@@ -478,6 +498,25 @@ void sighandler( int sig )
 // ecp a b c =>		copy a (file) and b (file) 		in c (folder)
 int main (int argc, char **argv)
 {
+
+	// test sums
+	/*{
+		int i;
+		for (i = sizeof(m_hashalgocol) / sizeof(m_hashalgocol[0]) - 1; i >= 0; i--)
+		{
+			if (m_hashalgocol[i].sumfunc && m_hashalgocol[i].printfunc)
+			{
+				unsigned char *checksum;
+				m_hashalgocol[i].sumfunc(argv[0], &checksum);
+				printf("%s = ", m_hashalgocol[i].name);
+				m_hashalgocol[i].printfunc(checksum);
+				printf("\n");
+				free(checksum);
+			}
+		}  
+		return 0;
+	}*/
+
 	bCreateEmptyDir = false;
 	nTotalFilesRead = nTotalFilesCopied = nChecksumErrors = 0;
 	if (argc < 3)
@@ -488,7 +527,7 @@ int main (int argc, char **argv)
 		return 1;
 	}
 
-	pHashAlgo = &m_hashalgocol[2];
+	pHashAlgo = &m_hashalgocol[1];
 
 	while(*argv++)
 	{
@@ -504,7 +543,7 @@ int main (int argc, char **argv)
 		{
 			char *ALGO = &(*argv)[3];
 			int i;
-			for (i = sizeof(m_hashalgocol) / sizeof(m_hashalgocol[0]); i >= 0; i--)
+			for (i = sizeof(m_hashalgocol) / sizeof(m_hashalgocol[0]) - 1; i >= 0; i--)
 			{
 				if (!strcasecmp(ALGO, m_hashalgocol[i].name))
 				{
@@ -545,7 +584,7 @@ int main (int argc, char **argv)
 		if (numfiles > 1)
 		{
 			// dest must be a folder
-			if (mkdir_p(target, len) == 0)
+			if (mkdir_p(target, 0777) == 0)
 			{
 				printf("could not create %s\n", target);
 				return 1;

@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "md5.h"
+#include "sha1.h"
+#include "sha256.h"
+#include "sha512.h"
 #include "fadvise.h"
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -84,19 +87,17 @@ bool rawcopy(char *src, char *dst, unsigned char **checksum)
 	return true;
 }
 
-
-bool md5copy(char *src, char *dst, unsigned char **checksum)
+bool hashcopy(char *src, char *dst, unsigned char **checksum, int (*hashfunc)(), int DIGEST_BYTES, int DIGEST_ALIGN)
 {
-
-	unsigned char *ret = (unsigned char*)malloc(sizeof(unsigned char*)*16);
+	unsigned char *ret = (unsigned char*)malloc(sizeof(unsigned char*)*DIGEST_BYTES);
 	if (ret==NULL)
 	{
-		printf("md5copy: Failed to alloc memory (node-checksum)\n");
+		printf("sha1copy: Failed to alloc memory (node-checksum)\n");
 		return false;
 	}
-
-	unsigned char bin_buffer_unaligned[20];
-	unsigned char *bin_buffer = ptr_align (bin_buffer_unaligned, 4);
+	
+	unsigned char bin_buffer_unaligned[DIGEST_BYTES+DIGEST_ALIGN];
+	unsigned char *bin_buffer = ptr_align (bin_buffer_unaligned, DIGEST_ALIGN);
 
 
 	FILE *fp, *fpdst;
@@ -126,7 +127,7 @@ bool md5copy(char *src, char *dst, unsigned char **checksum)
 
 
 	fadvise (fp, FADVISE_SEQUENTIAL);
-	err = md5_stream(fp, fpdst, bin_buffer);
+	err = hashfunc(fp, fpdst, bin_buffer);
 	if (err)
 	{
 		printf("error on copy: %s", src);
@@ -138,7 +139,9 @@ bool md5copy(char *src, char *dst, unsigned char **checksum)
 		DrawProgressBar(100, dSpeed, src, '=');
 	}
 	else
+	{
 		DrawProgressBar(100, dSpeed, src, '#');
+	}
 
 	if (fclose (fpdst) != 0)
 	{
@@ -152,9 +155,15 @@ bool md5copy(char *src, char *dst, unsigned char **checksum)
 		return false;
 	}
 
-	memcpy(ret, bin_buffer, 16);
+	memcpy(ret, bin_buffer, DIGEST_BYTES);
 	*checksum = ret;
 	return true;
+}
+
+
+bool md5copy(char *src, char *dst, unsigned char **checksum)
+{
+	return hashcopy(src, dst, checksum, md5_stream, 16, 4);
 }
 
 bool md5sum(char *src, unsigned char **checksum)
@@ -171,6 +180,137 @@ void md5print(unsigned char *checksum)
 {
 	int i,j;
 	for (i = 0, j = 0; i < 16 ; ++i, j+=2)
+	{
+		printf("%02x", checksum[i]);
+	}
+}
+
+
+
+bool sha1copy(char *src, char *dst, unsigned char **checksum)
+{
+	//return false;
+	return hashcopy(src, dst, checksum, sha1_stream, 20, 4);
+}
+
+bool sha1sum(char *src, unsigned char **checksum)
+{
+	return sha1copy(src, NULL, checksum);
+}
+bool sha1cmp(unsigned char *checksum1, unsigned char *checksum2)
+{
+	if (checksum1 != NULL && checksum2 != NULL)
+		return (memcmp(checksum1, checksum2, 20) == 0) ? true : false;
+	return false;
+}
+void sha1print(unsigned char *checksum)
+{
+	int i,j;
+	for (i = 0, j = 0; i < 20 ; ++i, j+=2)
+	{
+		printf("%02x", checksum[i]);
+	}
+}
+
+
+
+bool sha224copy(char *src, char *dst, unsigned char **checksum)
+{
+	//return false;
+	return hashcopy(src, dst, checksum, sha224_stream, 28, 4);
+}
+
+bool sha224sum(char *src, unsigned char **checksum)
+{
+	return sha224copy(src, NULL, checksum);
+}
+bool sha224cmp(unsigned char *checksum1, unsigned char *checksum2)
+{
+	if (checksum1 != NULL && checksum2 != NULL)
+		return (memcmp(checksum1, checksum2, 28) == 0) ? true : false;
+	return false;
+}
+void sha224print(unsigned char *checksum)
+{
+	int i,j;
+	for (i = 0, j = 0; i < 28 ; ++i, j+=2)
+	{
+		printf("%02x", checksum[i]);
+	}
+}
+
+
+bool sha256copy(char *src, char *dst, unsigned char **checksum)
+{
+	//return false;
+	return hashcopy(src, dst, checksum, sha256_stream, 32, 4);
+}
+
+bool sha256sum(char *src, unsigned char **checksum)
+{
+	return sha256copy(src, NULL, checksum);
+}
+bool sha256cmp(unsigned char *checksum1, unsigned char *checksum2)
+{
+	if (checksum1 != NULL && checksum2 != NULL)
+		return (memcmp(checksum1, checksum2, 32) == 0) ? true : false;
+	return false;
+}
+void sha256print(unsigned char *checksum)
+{
+	int i,j;
+	for (i = 0, j = 0; i < 32 ; ++i, j+=2)
+	{
+		printf("%02x", checksum[i]);
+	}
+}
+
+bool sha384copy(char *src, char *dst, unsigned char **checksum)
+{
+	//return false;
+	return hashcopy(src, dst, checksum, sha384_stream, 48, 8);
+}
+
+bool sha384sum(char *src, unsigned char **checksum)
+{
+	return sha384copy(src, NULL, checksum);
+}
+bool sha384cmp(unsigned char *checksum1, unsigned char *checksum2)
+{
+	if (checksum1 != NULL && checksum2 != NULL)
+		return (memcmp(checksum1, checksum2, 48) == 0) ? true : false;
+	return false;
+}
+void sha384print(unsigned char *checksum)
+{
+	int i,j;
+	for (i = 0, j = 0; i < 48 ; ++i, j+=2)
+	{
+		printf("%02x", checksum[i]);
+	}
+}
+
+
+bool sha512copy(char *src, char *dst, unsigned char **checksum)
+{
+	//return false;
+	return hashcopy(src, dst, checksum, sha512_stream, 64, 8);
+}
+
+bool sha512sum(char *src, unsigned char **checksum)
+{
+	return sha512copy(src, NULL, checksum);
+}
+bool sha512cmp(unsigned char *checksum1, unsigned char *checksum2)
+{
+	if (checksum1 != NULL && checksum2 != NULL)
+		return (memcmp(checksum1, checksum2, 64) == 0) ? true : false;
+	return false;
+}
+void sha512print(unsigned char *checksum)
+{
+	int i,j;
+	for (i = 0, j = 0; i < 64 ; ++i, j+=2)
 	{
 		printf("%02x", checksum[i]);
 	}
