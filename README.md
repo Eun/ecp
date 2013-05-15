@@ -12,3 +12,5 @@ Usage
 TODO
 ==============
 * delete files after successfull copied, aka move
+* show start time, end time time taken
+* crc32
