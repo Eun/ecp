@@ -8,8 +8,8 @@
 	#define bool unsigned char
 #endif
 
-bool rawcopy(char *src, int filesize, char *dst, unsigned char *checksum);
-bool md5copy(char *src, int filesize, char *dst, unsigned char *checksum);
-bool md5sum(char *src, int filesize, unsigned char *checksum);
+bool rawcopy(char *src, char *dst, unsigned char **checksum);
+bool md5copy(char *src, char *dst, unsigned char **checksum);
+bool md5sum(char *src, unsigned char **checksum);
 bool md5cmp(unsigned char *checksum1, unsigned char *checksum2);
 void md5print(unsigned char *checksum);

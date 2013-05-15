@@ -179,18 +179,26 @@ void DoWork(struct DataNode *node)
 		{
 		 if (fileDestination.st_size == fileSource.st_size)
 		 {
-			 unsigned char *checksum;
-			 printf("Comparing Checksums (%s == %s)\n",node->destination, node->source);
-			 pHashAlgo->sumfunc(node->source, fileSource.st_size, &(node->checksum)); 
-			 pHashAlgo->sumfunc(node->destination, fileDestination.st_size, &checksum); 
-			 if (pHashAlgo->cmpfunc(checksum, node->checksum))
-			 {
+			unsigned char *checksum;
+			ffile = node->source;
+			fSize = (unsigned int)fileSource.st_size;
+			dSpeed = fSize;
+			wSize = 0;
+			pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
+			pHashAlgo->sumfunc(node->source, &(node->checksum)); 
+			ffile = node->destination;
+			dSpeed = fSize;
+			wSize = 0;
+			pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
+			pHashAlgo->sumfunc(node->destination, &checksum); 
+			if (pHashAlgo->cmpfunc(checksum, node->checksum))
+			{
 				 free(checksum);
 				 DrawProgressBar(100, fileDestination.st_size, ffile, '-');
 				 JumpAndFree(&node, false);
 				 continue; 
-			 }
-			 free(checksum);
+			}
+			free(checksum);
 		 }
 		}
 
@@ -213,7 +221,7 @@ void DoWork(struct DataNode *node)
 			dSpeed = fSize;
 			wSize = 0;
 			pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
-			pHashAlgo->copyfunc(node->source, fileSource.st_size, node->destination, node->checksum); 
+			pHashAlgo->copyfunc(node->source, node->destination, &(node->checksum)); 
 		}
 		nTotalFilesCopied++;
 		node = node->next;
@@ -229,7 +237,7 @@ void DoWork(struct DataNode *node)
 	
 			if (stat(node->destination, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
 			{
-				pHashAlgo->sumfunc(node->destination, fileDestination.st_size, checksum); 
+				pHashAlgo->sumfunc(node->destination, &checksum); 
 			}
 			if (pHashAlgo->cmpfunc(node->checksum, checksum) == false)
 			{

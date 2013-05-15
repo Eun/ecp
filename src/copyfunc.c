@@ -27,9 +27,9 @@ ptr_align (void const *ptr, size_t alignment)
 
 
 
-bool rawcopy(char *src, int filesize, char *dst, unsigned char *checksum)
+bool rawcopy(char *src, char *dst, unsigned char **checksum)
 {
-	checksum = NULL;
+	*checksum = NULL;
 	FILE *fp, *fpdst;
 
 	fp = fopen (src, "rb");
@@ -85,11 +85,11 @@ bool rawcopy(char *src, int filesize, char *dst, unsigned char *checksum)
 }
 
 
-bool md5copy(char *src, int filesize, char *dst, unsigned char *checksum)
+bool md5copy(char *src, char *dst, unsigned char **checksum)
 {
 
-	checksum = (unsigned char*)malloc(sizeof(unsigned char*)*16);
-	if (checksum==NULL)
+	unsigned char *ret = (unsigned char*)malloc(sizeof(unsigned char*)*16);
+	if (ret==NULL)
 	{
 		printf("md5copy: Failed to alloc memory (node-checksum)\n");
 		return false;
@@ -152,14 +152,14 @@ bool md5copy(char *src, int filesize, char *dst, unsigned char *checksum)
 		return false;
 	}
 
-	memcpy(checksum, bin_buffer, 16);
-
+	memcpy(ret, bin_buffer, 16);
+	*checksum = ret;
 	return true;
 }
 
-bool md5sum(char *src, int filesize, unsigned char *checksum)
+bool md5sum(char *src, unsigned char **checksum)
 {
-	return md5copy(src, filesize, NULL, checksum);
+	return md5copy(src, NULL, checksum);
 }
 bool md5cmp(unsigned char *checksum1, unsigned char *checksum2)
 {
