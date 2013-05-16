@@ -15,7 +15,6 @@ LIBS = -lpthread
 # ========================================================================= #
 
 SILENT = 2>/dev/null || true
-pathpat=(.*/[^/]*)+:[0-9]+
 pathpatlink=(.*/[^/]*)+:
 ccred=$(shell echo -e "\033[0;31m")
 ccyellow=$(shell echo -e "\033[0;33m")
@@ -37,7 +36,7 @@ dirs:
 
 $(BIN): $(OBJ)
 	@echo -e "\033[1m\033[4m2. LINKING\033[0m"
-	@sed -E -e "/undefined[: ]/ s%$(pathpatlink)%$(ccred)&$(ccend)%g" -e "s/obj\///" -e "s/.\///" < output &
+	@sed -e 's/\(.*src\/\)\([a-zA-Z.\/]*\):\(.*\)\(: [Uu]ndefined[: ]\)/$(ccred)\2$(ccend):$(ccbold)\3$(ccend)\4/g' < output &
 	@$(LINK) $(LDFLAGS) $(OBJ) $(LIBS) -o ./bin/$@ &> output
 	-@rm -rf output
 	@echo -e "\033[1m\033[4m3. DONE\033[0m"	
@@ -45,12 +44,12 @@ $(BIN): $(OBJ)
 	
 ./obj/%.o: ./src/%.c
 	@echo -e "\033[1m>> $<\033[0m" | sed 's/src\///g'
-	@sed -E -e "/[Ee]rror[: ]/ s%$(pathpat)%$(ccred)&$(ccend)%g" -e "/[Ww]arning[: ]/ s%$(pathpat)%$(ccyellow)&$(ccend)%g" -e "s/src\///" < output &
+	@sed -e 's/\(.*src\/\)\([a-zA-Z.\/]*\):\(.*\)\(: [Ee]rror[: ]\)/$(ccred)\2$(ccend):$(ccbold)\3$(ccend)\4/g;s/\(.*src\/\)\([a-zA-Z.\/]*\):\(.*\)\(: [Ww]arning[: ]\)/$(ccyellow)\2$(ccend):$(ccbold)\3$(ccend)\4/g' < output &
 	@$(CC) $(CFLAGS) -o $@ -c $< &> output
 	
 ./obj/%.opp: ./src/%.cpp
 	@echo -e "\033[1m>> $<\033[0m" | sed 's/src\///g'
-	@sed -E -e "/[Ee]rror[: ]/ s%$(pathpat)%$(ccred)&$(ccend)%g" -e "/[Ww]arning[: ]/ s%$(pathpat)%$(ccyellow)&$(ccend)%g" -e "s/src\///" < output &
+	@sed -e 's/\(.*src\/\)\([a-zA-Z.\/]*\):\(.*\)\(: [Ee]rror[: ]\)/$(ccred)\2$(ccend):$(ccbold)\3$(ccend)\4/g;s/\(.*src\/\)\([a-zA-Z.\/]*\):\(.*\)\(: [Ww]arning[: ]\)/$(ccyellow)\2$(ccend):$(ccbold)\3$(ccend)\4/g' < output &
 	@$(CPLUS) $(CPPFLAGS) -o $@ -c $< &> output
 	
 
