@@ -1,5 +1,6 @@
+
 Usage
-=====
+-----
     usage: ecp [OPTION] SOURCE... DESTINATION
     
     OPTION can be:
@@ -10,7 +11,7 @@ Usage
      -d               create empty directorys
     
 TODO
-==============
-* delete files after successfull copied, aka move
-* show start time, end time time taken
+----
+* delete files after successfull copied, aka move files
+* show start time, end time, time taken
 * crc32
