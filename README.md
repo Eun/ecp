@@ -1,4 +1,3 @@
-
 Usage
 -----
     usage: ecp [OPTION] SOURCE... DESTINATION
@@ -29,9 +28,11 @@ How It Works
 3. (Optional use `-v`)  The checksum of the source file will be recalculated (if Step 1 has read errors) and compared to the new file checksum.
 
 Using all 3 Steps, this is simply a replacement for:
+
     cp source_file destination_file
     md5sum sourcefile
     md5sum destination_file
+    
 (with multiple files, good for backups)
 
 Using 2 Steps, you have a simple copy command and you verify that the data transfer is succeeded without problems.
