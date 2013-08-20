@@ -505,6 +505,10 @@ void sighandler( int sig )
 	exit(0);
 }
 
+void PrintVersionText()
+{
+	printf("ecp 1.01\nLicence: GNU GPL Version 3 <http://gnu.org/licenses/gpl.html>\n\nWritten by Tobias Salzmann\n");
+}
 
 // ecp a b => 		copy a (file) 					to b (file)
 // ecp a b/ => 		copy a (file) 					in b (folder)
@@ -536,8 +540,17 @@ int main (int argc, char **argv)
 	nTotalFilesRead = nTotalFilesCopied = nChecksumErrors = 0;
 	if (argc < 3)
 	{
+		if (argc == 2)
+		{
+			if (argv[1][1] == 'v' || (!strncasecmp(argv[1], "--version", 9)))
+			{
+				PrintVersionText();
+				return 1;
+			}
+		}
+		
 		char *exe = basename(argv[0], strlen(argv[0]));
-		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION can be:\n -h=HASHALGO      decide which hash algorithm should be used.\n                    HASHALGO can be:\n                      NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.\n                    Default is MD5\n -d               create empty directorys\n", exe);
+		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION can be:\n -h=HASHALGO      decide which hash algorithm should be used.\n                    HASHALGO can be:\n                      NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.\n                    Default is MD5\n -d               create empty directorys\n -v               shows version number\n", exe);
 		free(exe);
 		return 1;
 	}
@@ -550,9 +563,14 @@ int main (int argc, char **argv)
 		if (*argv == NULL || (*argv)[0] != '-')
 			break;
 		
-		if ((*argv)[1] == 'd')
+		if ((*argv)[1] == 'v')
 		{
-				bCreateEmptyDir = true;
+			PrintVersionText();
+			return 1;
+		}
+		else if ((*argv)[1] == 'd')
+		{
+			bCreateEmptyDir = true;
 		}
 		else if ((*argv)[1] == 'h' && (*argv)[2] == '=')
 		{
