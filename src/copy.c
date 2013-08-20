@@ -55,6 +55,7 @@ unsigned long nChecksumErrors;
 unsigned long nTotalFilesRead;
 unsigned long nTotalFilesCopied;
 bool bCreateEmptyDir;
+bool bVerifyAfterCopy;
 struct HASHALGOCOL* pHashAlgo;
 
 char *pDestinationPath;
@@ -224,7 +225,7 @@ void DoWork(struct DataNode *node)
 		// check if the destination folder exists
 		char *destfolder = dirname(node->destination, strlen(node->destination));
 
-		if (stat(destfolder, &fileDestination) == -1)
+		if (destfolder[strlen(destfolder)-1] == '/' && stat(destfolder, &fileDestination) == -1)
 		{
 			if (mkdir_p(destfolder, 0777) == 0)
 			{
@@ -274,6 +275,32 @@ void DoWork(struct DataNode *node)
 				printf(")\n");
 				nChecksumErrors++;
 			}
+
+			if (bVerifyAfterCopy)
+			{
+				if (stat(node->source, &fileDestination) == 0 && S_ISREG(fileDestination.st_mode))
+				{
+					ffile = node->source;
+					fSize = (unsigned int)fileDestination.st_size;
+					dSpeed = fSize;
+					wSize = 0;
+					pthread_create(&tSpeadMeassure, NULL, &SpeedMeasure, NULL);
+					pHashAlgo->sumfunc(node->source, &checksum); 
+				}
+
+				if (pHashAlgo->cmpfunc(node->checksum, checksum) == false)
+				{
+					printf("Mismatching Checksum! '%s' (", node->source);
+					if (pHashAlgo->printfunc)
+						pHashAlgo->printfunc(node->checksum);
+					printf(") not matches '%s' (",node->destination);
+					if (pHashAlgo->printfunc)
+						pHashAlgo->printfunc(checksum);
+					printf(")\n");
+					nChecksumErrors++;
+				}
+			}
+
 			free(checksum);
 		}
 		JumpAndFree(&node, true);
@@ -507,7 +534,7 @@ void sighandler( int sig )
 
 void PrintVersionText()
 {
-	printf("ecp 1.01\nLicence: GNU GPL Version 3 <http://gnu.org/licenses/gpl.html>\n\nWritten by Tobias Salzmann\n");
+	printf("ecp 1.02\nLicence: GNU GPL Version 3 <http://gnu.org/licenses/gpl.html>\n\nWritten by Tobias Salzmann\n");
 }
 
 // ecp a b => 		copy a (file) 					to b (file)
@@ -537,6 +564,7 @@ int main (int argc, char **argv)
 	}*/
 
 	bCreateEmptyDir = false;
+	bVerifyAfterCopy = false;
 	nTotalFilesRead = nTotalFilesCopied = nChecksumErrors = 0;
 	if (argc < 3)
 	{
@@ -550,7 +578,7 @@ int main (int argc, char **argv)
 		}
 		
 		char *exe = basename(argv[0], strlen(argv[0]));
-		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION can be:\n -h=HASHALGO      decide which hash algorithm should be used.\n                    HASHALGO can be:\n                      NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.\n                    Default is MD5\n -d               create empty directorys\n -v               shows version number\n", exe);
+		printf("usage: %s [OPTION] SOURCE... DESTINATION\n\nOPTION can be:\n -h=HASHALGO      decide which hash algorithm should be used.\n                    HASHALGO can be:\n                      NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.\n                    Default is MD5\n -d               create empty directories\n -v               verify the checksum after copy (additionally)\n --version        shows version number\n", exe);
 		free(exe);
 		return 1;
 	}
@@ -565,8 +593,7 @@ int main (int argc, char **argv)
 		
 		if ((*argv)[1] == 'v')
 		{
-			PrintVersionText();
-			return 1;
+			bVerifyAfterCopy = true;
 		}
 		else if ((*argv)[1] == 'd')
 		{
@@ -580,13 +607,12 @@ int main (int argc, char **argv)
 			{
 				if (!strcasecmp(ALGO, m_hashalgocol[i].name))
 				{
-					*pHashAlgo = m_hashalgocol[i];
+					pHashAlgo = &m_hashalgocol[i];
 					break;
 				}
 			}  
 		}
 	}
-
 
 	signal(SIGABRT, &sighandler);
 	signal(SIGTERM, &sighandler);
@@ -638,17 +664,28 @@ int main (int argc, char **argv)
 		if (*argv != NULL)
 		{
 			int lsrc = strlen(*argv);
-			char* bname = basename(*argv, lsrc);
-			int lbname = strlen(bname);
-			int lsFullPath = len+appendslash+lbname;
-			char* sFullPath = (char*)malloc(sizeof(char*)*(lsFullPath+1));
-			memcpy(sFullPath, target, len);
-			if (appendslash)
+			int lsFullPath;
+			char* sFullPath;
+			if (numfiles > 1 || target[len-1] == '/' || appendslash == true)
 			{
-				sFullPath[len+appendslash-1] = '/';
+				char* bname = basename(*argv, lsrc);
+				int lbname = strlen(bname);
+				lsFullPath = len+appendslash+lbname;
+				sFullPath = (char*)malloc(sizeof(char*)*(lsFullPath+1));
+				memcpy(sFullPath, target, len);
+				if (appendslash)
+				{
+					sFullPath[len+appendslash-1] = '/';
+				}
+				memcpy(sFullPath+len+appendslash, bname, lbname);
+				free(bname);
 			}
-			memcpy(sFullPath+len+appendslash, bname, lbname);
-			free(bname);
+			else
+			{
+				lsFullPath = len;
+				sFullPath = (char*)malloc(sizeof(char*)*(lsFullPath+1));
+				memcpy(sFullPath, target, len);
+			}
 
 			sFullPath[lsFullPath] = 0;
 			//printf("%s => %s\n", *argv, sFullPath);
@@ -679,7 +716,7 @@ int main (int argc, char **argv)
 			}
 			free(sFullPath);
 		}
-		*argv++;
+		argv++;
 	}
 
 	DoWork(firstNode);

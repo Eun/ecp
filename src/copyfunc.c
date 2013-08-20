@@ -50,6 +50,19 @@ bool rawcopy(char *src, char *dst, unsigned char **checksum)
 	*checksum = NULL;
 	FILE *fp, *fpdst;
 
+
+	#ifdef _GNU_SOURCE
+		int fd = open(src, O_RDONLY);
+		if (fd != -1)
+		{
+			syncfs(fd);
+			close(fd);
+		}
+	#else
+		int fd;
+		sync();
+	#endif
+
 	fp = fopen (src, "rb");
 	if (fp == NULL)
 	{
@@ -87,12 +100,17 @@ bool rawcopy(char *src, char *dst, unsigned char **checksum)
 	} 
 	DrawProgressBar(100, dSpeed, src, '=');
 
-
 	if (fclose (fpdst) != 0)
 	{
 		fclose(fp);
 		printf("error on close: %s", dst);
 		return false;
+	}
+	fd = open(dst, O_RDWR);
+	if (fd != -1)
+	{
+		fsync(fd);
+		close(fd);
 	}
 	if (fclose (fp) != 0)
 	{
@@ -107,7 +125,7 @@ bool hashcopy(char *src, char *dst, unsigned char **checksum, int (*hashfunc)(),
 	unsigned char *ret = (unsigned char*)malloc(sizeof(unsigned char*)*DIGEST_BYTES);
 	if (ret==NULL)
 	{
-		printf("sha1copy: Failed to alloc memory (node-checksum)\n");
+		printf("hashcopy: Failed to alloc memory (node-checksum)\n");
 		return false;
 	}
 	
@@ -118,22 +136,34 @@ bool hashcopy(char *src, char *dst, unsigned char **checksum, int (*hashfunc)(),
 	FILE *fp, *fpdst;
 	int err;
 
+	#ifdef _GNU_SOURCE
+		int fd = open(src, O_RDONLY);
+		if (fd != -1)
+		{
+			syncfs(fd);
+			close(fd);
+		}
+	#else
+		int fd;
+		sync();
+	#endif
+
 	fp = fopen (src, "rb");
 	if (fp == NULL)
 	{
-	 printf("error on opening: %s", src);
-	 return false;
+		printf("error on opening: %s", src);
+		return false;
 	}
 
 	if (dst != NULL)
 	{
-	 fpdst = fopen (dst, "wb");
-	 if (fp == NULL)
-	 {
-		 fclose(fp);
-		 printf("error on opening: %s", dst);
-		 return false;
-	 }
+		fpdst = fopen (dst, "wb");
+		if (fp == NULL)
+		{
+			fclose(fp);
+			printf("error on opening: %s", dst);
+			return false;
+		}
 	}
 	else
 	{
@@ -164,6 +194,13 @@ bool hashcopy(char *src, char *dst, unsigned char **checksum, int (*hashfunc)(),
 		printf("error on close: %s", dst);
 		return false;
 	}
+	fd = open(dst, O_RDWR);
+	if (fd != -1)
+	{
+		fsync(fd);
+		close(fd);
+	}
+
 	if (fclose (fp) != 0)
 	{
 		printf("error on close: %s", src);
