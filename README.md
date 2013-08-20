@@ -15,3 +15,4 @@ TODO
 * delete files after successfull copied, aka move files
 * show start time, end time, time taken
 * crc32
+* perform checksum after copy to verify that the read operation was successfull
