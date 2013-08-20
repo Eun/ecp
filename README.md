@@ -1,3 +1,4 @@
+
 Usage
 -----
     usage: ecp [OPTION] SOURCE... DESTINATION
@@ -7,6 +8,7 @@ Usage
                         HASHALGO can be:
                           NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.
                         Default is MD5
+     -d               create empty directorys
      -d               create empty directories
      -v               verify the checksum after copy (additionally)
      --version        shows version number
@@ -39,9 +41,11 @@ Using 2 Steps, you have a simple copy command and you verify that the data trans
     
 TODO
 ----
+* delete files after successfull copied, aka move files
 * delete files after successful copied, aka move files
 * show start time, end time, time taken
 * crc32
+
 
 
 CHANGELOG
