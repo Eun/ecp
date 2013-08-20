@@ -1,4 +1,3 @@
-
 Usage
 -----
     usage: ecp [OPTION] SOURCE... DESTINATION
@@ -9,6 +8,7 @@ Usage
                           NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512.
                         Default is MD5
      -d               create empty directorys
+     -v               shows version number
     
 TODO
 ----
